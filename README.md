@@ -26,12 +26,6 @@ landratsamt-puzzle-league/
 └── music/
   ├── menu.mp3        # Menu background music
   └── theme.mp3       # In-game background music
-```
-
-## HTML Files
-
-### index.html
-The main menu page that serves as the entry point to the game.
 
 #### Key Features:
 - **Game Mode Selection**
