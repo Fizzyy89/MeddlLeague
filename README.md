@@ -3,30 +3,6 @@
 ## Overview
 Landratsamt Puzzle League is a browser-based match-3 puzzle game inspired by games like Panel de Pon/Tetris Attack. The game features both single-player and AI opponent modes, multiple themes, and difficulty settings.
 
-## File Structure
-The game is organized into several key files and directories: 
-
-landratsamt-puzzle-league/
-├── index.html           # Main menu/landing page
-├── game.html           # Game interface
-├── css/
-│ ├── style.css        # Main styles
-│ ├── themes.css       # Theme-specific styles
-│ └── animations.css   # Animation definitions
-├── js/
-│ ├── main.js         # Game initialization and management
-│ ├── game-logic.js   # Core gameplay mechanics
-│ ├── state.js        # Game state management
-│ ├── input.js        # Input handling
-│ ├── dom.js          # DOM manipulation
-│ ├── audio.js        # Audio system
-│ ├── ai-logic.js     # AI opponent logic
-│ ├── theme-manager.js # Theme management
-│ └── config.js       # Game constants and settings
-└── music/
-  ├── menu.mp3        # Menu background music
-  └── theme.mp3       # In-game background music
-
 #### Key Features:
 - **Game Mode Selection**
   - Solo Play
@@ -55,10 +31,6 @@ landratsamt-puzzle-league/
   - Bouncing emoji animations
   - Retro-styled logo
 
-### game.html
-The main game interface where gameplay takes place.
-
-#### Key Features:
 - **Game Boards**
   - Main player grid
   - AI opponent grid (for VS mode)
