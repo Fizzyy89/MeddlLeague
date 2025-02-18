@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Landratsamt Puzzle League</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/themes.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+
+<body>
+<a href="index.html" class="back-button">← Menu</a>
+<div id="bouncing-emoji-container">
+  <div class="bouncing-emoji"></div>
+  <div class="bouncing-emoji"></div>
+  <div class="bouncing-emoji"></div>
+  <div class="bouncing-emoji"></div>
+  <div class="bouncing-emoji"></div>
+</div>
+<audio id="bgMusic" loop>
+  <source src="music/theme.mp3" type="audio/mpeg">
+</audio>
+
+<div class="particles">
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+  <div class="particle"></div>
+</div>
+
+<div class="boards-container">
+  <div class="game-container theme-animals">
+    <div class="grid" id="gameGrid"></div>
+    <div class="cursor-container" id="cursorContainer"></div>
+  </div>
+  
+  <div class="game-container theme-retro">
+    <div class="grid" id="aiGrid"></div>
+    <div class="cursor-container" id="aiCursor"></div>
+  </div>
+</div>
+
+<div class="info-box">
+  <button class="info-box-toggle">→</button>
+  <div class="game-mode-container">
+    <h1 id="gameMode">SOLO PLAY</h1>
+    <div class="difficulty-indicator">DIFFICULTY <span id="currentDifficulty">3</span></div>
+  </div>
+  <div class="score-display">
+    <div>SCORE: <span id="scoreValue">0</span></div>
+    <div>HIGH SCORE: <span id="highScoreValue">0</span></div>
+  </div>
+  <h2>HOW TO PLAY</h2>
+  <ul>
+    <li>KEYBOARD: Move with arrow keys, swap with space</li>
+    <li>MOUSE: Move cursor, click to swap</li>
+    <li>Match 3+ same blocks to clear them</li>
+    <li>New blocks drop from above!</li>
+    <li>If you run out of space, GAME OVER!</li>
+  </ul>
+  <div class="theme-select">
+    <select id="themeSelect">
+      <option value="theme-elements">Elements Theme</option>
+      <option value="theme-animals">Farm Animals</option>
+      <option value="theme-retro">Retro Gaming</option>
+      <option value="theme-space">Space Theme</option>
+      <option value="theme-food">Food Theme</option>
+      <option value="theme-weather">Weather Theme</option>
+    </select>
+  </div>
+</div>
+<div id="volumeControl">
+  <button id="muteBtn">🔊</button>
+  <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3">
+</div>
+  
+<script type="module" src="js/main.js"></script>
+</body>
+
+</html>

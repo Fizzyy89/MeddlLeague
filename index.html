@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Landratsamt Puzzle League</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/themes.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <audio id="bgMusic" loop>
+    <source src="music/menu.mp3" type="audio/mpeg">
+  </audio>
+
+  <div class="particles">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
+  <div class="bouncing-emoji-container">
+    <div class="bouncing-emoji">🔥</div>
+    <div class="bouncing-emoji">💧</div>
+    <div class="bouncing-emoji">🍀</div>
+    <div class="bouncing-emoji">⚡</div>
+    <div class="bouncing-emoji">🌀</div>
+  </div>
+
+  <div class="logo">
+    LANDRATSAMT<br>
+    PUZZLE LEAGUE
+  </div>
+
+  <div class="menu">
+    <a href="game.html?mode=solo" class="menu-item">Play Solo</a>
+    <a href="game.html?mode=vs-ai" class="menu-item">Play VS. Computer (ALPHA)</a>
+    <button class="menu-item" onclick="document.getElementById('optionsModal').classList.add('show')">Options</button>
+    <button class="menu-item" onclick="document.getElementById('highScoresModal').classList.add('show')">High Scores</button>
+  </div>
+
+  <div id="volumeControl">
+    <button id="muteBtn">🔊</button>
+    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3">
+  </div>
+
+  <div id="optionsModal" class="modal-overlay">
+    <div class="options-layout">
+      <div class="options-container">
+        <button class="close-modal">×</button>
+        <h1 class="options-title">OPTIONS</h1>
+
+        <div class="option-group difficulty-section">
+          <h2>DIFFICULTY</h2>
+          <div class="difficulty-display">
+            <div class="difficulty-level" id="difficultyText">EASY</div>
+            <div class="difficulty-number" id="difficultyValue">3</div>
+          </div>
+          
+          <div class="slider-container">
+            <input type="range" 
+                   id="difficultySlider" 
+                   min="1" 
+                   max="10" 
+                   step="1" 
+                   value="3">
+            <div class="slider-markers">
+              <span>1</span>
+              <span>2</span>
+              <span>3</span>
+              <span>4</span>
+              <span>5</span>
+              <span>6</span>
+              <span>7</span>
+              <span>8</span>
+              <span>9</span>
+              <span>10</span>
+            </div>
+          </div>
+
+          <div id="difficultyWarning" class="warning-box">
+            ⚠️ Warning: At these speeds, glitches may occur more frequently
+          </div>
+        </div>
+
+        <button id="saveOptions" class="save-button">SAVE CHANGES</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="highScoresModal" class="modal-overlay">
+    <div class="high-scores-layout">
+      <div class="high-scores-container">
+        <button class="close-modal">×</button>
+        <h1 class="high-scores-title">HIGH SCORES</h1>
+        
+        <div class="scores-grid">
+          <!-- Scores will be populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { audioManager } from './js/audio.js';
+    
+    const bgMusic = document.getElementById('bgMusic');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const muteBtn = document.getElementById('muteBtn');
+    
+    // Options Modal Elements
+    const optionsModal = document.getElementById('optionsModal');
+    const closeModalBtn = document.querySelector('.close-modal');
+    const difficultySlider = document.getElementById('difficultySlider');
+    const difficultyValue = document.getElementById('difficultyValue');
+    const saveButton = document.getElementById('saveOptions');
+    
+    // Difficulty settings
+    const difficultyLabels = {
+      1: 'VERY EASY',
+      2: 'VERY EASY',
+      3: 'EASY',
+      4: 'EASY',
+      5: 'MEDIUM',
+      6: 'MEDIUM',
+      7: 'MEDIUM',
+      8: 'HARD',
+      9: 'HARD',
+      10: 'NIGHTMARE'
+    };
+
+    const difficultyColors = {
+      1: '#90EE90', // light green
+      2: '#90EE90',
+      3: '#32CD32', // green
+      4: '#32CD32',
+      5: '#FFD700', // yellow
+      6: '#FFD700',
+      7: '#FFD700',
+      8: '#FF4444', // red
+      9: '#FF4444',
+      10: '#CC0000' // dark red
+    };
+
+    // Load saved settings
+    const savedVolume = localStorage.getItem('volume') || 0.3;
+    const savedMuted = localStorage.getItem('muted') === 'true';
+    const savedDifficulty = localStorage.getItem('gameDifficulty') || '3';
+    
+    // Initial setup
+    bgMusic.volume = savedVolume;
+    bgMusic.muted = savedMuted;
+    volumeSlider.value = savedVolume;
+    muteBtn.textContent = savedMuted ? '🔇' : '🔊';
+    difficultySlider.value = savedDifficulty;
+    difficultyValue.textContent = savedDifficulty;
+    
+    // Modal Controls
+    closeModalBtn.addEventListener('click', () => {
+      optionsModal.classList.remove('show');
+    });
+
+    optionsModal.addEventListener('click', (e) => {
+      if (e.target === optionsModal) {
+        optionsModal.classList.remove('show');
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && optionsModal.classList.contains('show')) {
+        optionsModal.classList.remove('show');
+      }
+    });
+
+    // Difficulty Controls
+    difficultySlider.addEventListener('input', (e) => {
+      const value = parseInt(e.target.value);
+      difficultyValue.textContent = value;
+      
+      // Update color
+      difficultySlider.style.setProperty('--slider-color', difficultyColors[value]);
+      
+      // Update difficulty text
+      const difficultyText = document.getElementById('difficultyText');
+      difficultyText.textContent = difficultyLabels[value];
+      difficultyText.style.color = difficultyColors[value];
+      
+      // Show/hide warning
+      const warningText = document.getElementById('difficultyWarning');
+      warningText.style.display = value >= 8 ? 'block' : 'none';
+    });
+
+    // Trigger initial difficulty update
+    difficultySlider.dispatchEvent(new Event('input'));
+
+    // Save Button
+    saveButton.addEventListener('click', () => {
+      localStorage.setItem('gameDifficulty', difficultySlider.value);
+      
+      // Show save confirmation
+      saveButton.textContent = 'Saved!';
+      saveButton.classList.add('saved');
+      
+      setTimeout(() => {
+        saveButton.textContent = 'SAVE CHANGES';
+        saveButton.classList.remove('saved');
+      }, 1500);
+    });
+    
+    // Volume Controls
+    volumeSlider.addEventListener('input', (e) => {
+      const newVolume = e.target.value;
+      bgMusic.volume = newVolume;
+      localStorage.setItem('volume', newVolume);
+      muteBtn.textContent = newVolume === '0' ? '🔇' : '🔊';
+    });
+
+    muteBtn.addEventListener('click', () => {
+      bgMusic.muted = !bgMusic.muted;
+      localStorage.setItem('muted', bgMusic.muted);
+      muteBtn.textContent = bgMusic.muted ? '🔇' : '🔊';
+    });
+
+    // Start music after first interaction
+    document.addEventListener('click', function initAudio() {
+      audioManager.bgMusic.play().catch(console.error);
+      document.removeEventListener('click', initAudio);
+    }, { once: true });
+
+    // High scores handling
+    const highScoresModal = document.getElementById('highScoresModal');
+    const closeHighScoresBtn = highScoresModal.querySelector('.close-modal');
+    const scoresGrid = document.querySelector('.scores-grid');
+
+    // Close high scores modal
+    closeHighScoresBtn.addEventListener('click', () => {
+      highScoresModal.classList.remove('show');
+    });
+
+    // Close on outside click
+    highScoresModal.addEventListener('click', (e) => {
+      if (e.target === highScoresModal) {
+        highScoresModal.classList.remove('show');
+      }
+    });
+
+    // Function to update high scores display
+    function updateHighScoresDisplay() {
+      scoresGrid.innerHTML = '';
+      
+      for (let difficulty = 1; difficulty <= 10; difficulty++) {
+        const score = localStorage.getItem(`highScore_${difficulty}`) || '0';
+        const difficultyLabel = difficultyLabels[difficulty];
+        
+        const scoreEntry = document.createElement('div');
+        scoreEntry.className = 'score-entry';
+        scoreEntry.dataset.difficulty = difficulty;
+        
+        scoreEntry.innerHTML = `
+          <div class="difficulty-header" style="color: ${difficultyColors[difficulty]}">
+            ${difficultyLabel} [${difficulty}]
+          </div>
+          <div class="score-value">
+            ${score}
+          </div>
+        `;
+        
+        scoresGrid.appendChild(scoreEntry);
+      }
+    }
+
+    // Update high scores when opening modal
+    document.querySelector('.menu-item[onclick*="highScoresModal"]').addEventListener('click', updateHighScoresDisplay);
+  </script>
+</body>
+</html> 
