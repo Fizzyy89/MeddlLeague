@@ -47,7 +47,11 @@
         <button class="info-box-toggle">→</button>
         <div class="game-mode-container">
             <h1>CANVAS MODE</h1>
-            <div class="difficulty-indicator">DIFFICULTY <span id="currentDifficulty">3</span></div>
+            <div class="difficulty-indicator">
+                DIFFICULTY: <span id="currentDifficulty">NORMAL</span><br>
+                SPEED: <span id="currentSpeed">3</span><br>
+                TIME: <span id="gameTimer">00:00</span>
+            </div>
         </div>
         <div class="score-display">
             <div>SCORE: <span id="scoreValue">0</span></div>
@@ -90,6 +94,7 @@
     <!-- Game Over Modal -->
     <div id="gameOverModal" class="game-over-modal" style="display: none;">
         <h2>GAME OVER!</h2>
+        <p>DIFFICULTY: <span id="finalDifficulty">NORMAL</span></p>
         <p>Final Score: <span id="finalScore">0</span></p>
         <p>High Score: <span id="finalHighScore">0</span></p>
         <button id="tryAgainBtn">Try Again</button>

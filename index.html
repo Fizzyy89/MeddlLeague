@@ -59,37 +59,56 @@
         <button class="close-modal">×</button>
         <h1 class="options-title">OPTIONS</h1>
 
+        <div class="option-group speed-section">
+          <h2>INITIAL SPEED</h2>
+          <div class="difficulty-display">
+            <div class="difficulty-level" id="speedText">NORMAL</div>
+            <div class="difficulty-number" id="speedValue">3</div>
+          </div>
+          
+          <div class="slider-container">
+            <input type="range" 
+                   id="speedSlider" 
+                   min="1" 
+                   max="50" 
+                   step="1" 
+                   value="3">
+            <div class="slider-markers">
+              <span>1</span>
+              <span>10</span>
+              <span>20</span>
+              <span>30</span>
+              <span>40</span>
+              <span>50</span>
+            </div>
+          </div>
+        </div>
+
         <div class="option-group difficulty-section">
           <h2>DIFFICULTY</h2>
           <div class="difficulty-display">
-            <div class="difficulty-level" id="difficultyText">EASY</div>
-            <div class="difficulty-number" id="difficultyValue">3</div>
+            <div class="difficulty-level" id="difficultyText">NORMAL</div>
           </div>
           
           <div class="slider-container">
             <input type="range" 
                    id="difficultySlider" 
-                   min="1" 
-                   max="10" 
+                   min="0" 
+                   max="4" 
                    step="1" 
-                   value="3">
+                   value="2">
             <div class="slider-markers">
-              <span>1</span>
-              <span>2</span>
-              <span>3</span>
-              <span>4</span>
-              <span>5</span>
-              <span>6</span>
-              <span>7</span>
-              <span>8</span>
-              <span>9</span>
-              <span>10</span>
+              <span>V.EASY</span>
+              <span>EASY</span>
+              <span>NORMAL</span>
+              <span>HARD</span>
+              <span>V.HARD</span>
             </div>
           </div>
+        </div>
 
-          <div id="difficultyWarning" class="warning-box">
-            ⚠️ Warning: At these speeds, glitches may occur more frequently
-          </div>
+        <div id="difficultyWarning" class="warning-box">
+          ⚠️ Warning: At these speeds, glitches may occur more frequently
         </div>
 
         <button id="saveOptions" class="save-button">SAVE CHANGES</button>
@@ -106,6 +125,8 @@
         <div class="scores-grid">
           <!-- Scores will be populated by JavaScript -->
         </div>
+
+        <button id="resetScores" class="reset-button">RESET ALL SCORES</button>
       </div>
     </div>
   </div>
@@ -119,92 +140,102 @@
     
     // Options Modal Elements
     const optionsModal = document.getElementById('optionsModal');
-    const closeModalBtn = document.querySelector('.close-modal');
+    const closeModalBtns = document.querySelectorAll('.close-modal');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValue = document.getElementById('speedValue');
     const difficultySlider = document.getElementById('difficultySlider');
-    const difficultyValue = document.getElementById('difficultyValue');
     const saveButton = document.getElementById('saveOptions');
     
-    // Difficulty settings
-    const difficultyLabels = {
-      1: 'VERY EASY',
-      2: 'VERY EASY',
-      3: 'EASY',
-      4: 'EASY',
-      5: 'MEDIUM',
-      6: 'MEDIUM',
-      7: 'MEDIUM',
-      8: 'HARD',
-      9: 'HARD',
-      10: 'NIGHTMARE'
+    // Speed settings
+    const speedLabels = {
+      1: 'VERY SLOW',
+      5: 'SLOW',
+      10: 'NORMAL',
+      20: 'FAST',
+      30: 'VERY FAST',
+      40: 'SUPER FAST',
+      50: 'NIGHTMARE'
     };
 
+    const speedColors = {
+      1: '#90EE90',  // light green
+      5: '#90EE90',  // light green
+      10: '#32CD32', // green
+      20: '#FFD700', // yellow
+      30: '#FFA500', // orange
+      40: '#FF4444', // red
+      50: '#CC0000'  // dark red
+    };
+
+    // Difficulty settings
+    const difficulties = ['very-easy', 'easy', 'normal', 'hard', 'very-hard'];
     const difficultyColors = {
-      1: '#90EE90', // light green
-      2: '#90EE90',
-      3: '#32CD32', // green
-      4: '#32CD32',
-      5: '#FFD700', // yellow
-      6: '#FFD700',
-      7: '#FFD700',
-      8: '#FF4444', // red
-      9: '#FF4444',
-      10: '#CC0000' // dark red
+      'very-easy': '#90EE90',  // light green
+      'easy': '#32CD32',       // green
+      'normal': '#FFD700',     // yellow
+      'hard': '#FF4444',       // red
+      'very-hard': '#CC0000'   // dark red
     };
 
     // Load saved settings
     const savedVolume = localStorage.getItem('volume') || 0.3;
     const savedMuted = localStorage.getItem('muted') === 'true';
-    const savedDifficulty = localStorage.getItem('gameDifficulty') || '3';
+    const savedSpeed = localStorage.getItem('gameSpeed') || '3';
+    const savedDifficulty = localStorage.getItem('gameDifficulty') || 'normal';
     
     // Initial setup
     bgMusic.volume = savedVolume;
     bgMusic.muted = savedMuted;
     volumeSlider.value = savedVolume;
     muteBtn.textContent = savedMuted ? '🔇' : '🔊';
-    difficultySlider.value = savedDifficulty;
-    difficultyValue.textContent = savedDifficulty;
+    speedSlider.value = savedSpeed;
+    speedValue.textContent = savedSpeed;
     
-    // Modal Controls
-    closeModalBtn.addEventListener('click', () => {
-      optionsModal.classList.remove('show');
+    // Set initial difficulty button
+    difficultySlider.value = difficulties.indexOf(savedDifficulty);
+
+    // Close button functionality
+    closeModalBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.closest('.modal-overlay').classList.remove('show');
+      });
     });
 
+    // Close on outside click
     optionsModal.addEventListener('click', (e) => {
       if (e.target === optionsModal) {
         optionsModal.classList.remove('show');
       }
     });
 
+    // Close on Escape key
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && optionsModal.classList.contains('show')) {
-        optionsModal.classList.remove('show');
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+          modal.classList.remove('show');
+        });
       }
     });
 
     // Difficulty Controls
     difficultySlider.addEventListener('input', (e) => {
-      const value = parseInt(e.target.value);
-      difficultyValue.textContent = value;
+      const index = parseInt(e.target.value);
+      const difficulty = difficulties[index];
+      const color = difficultyColors[difficulty];
       
-      // Update color
-      difficultySlider.style.setProperty('--slider-color', difficultyColors[value]);
-      
-      // Update difficulty text
+      // Update difficulty text and color
       const difficultyText = document.getElementById('difficultyText');
-      difficultyText.textContent = difficultyLabels[value];
-      difficultyText.style.color = difficultyColors[value];
-      
-      // Show/hide warning
-      const warningText = document.getElementById('difficultyWarning');
-      warningText.style.display = value >= 8 ? 'block' : 'none';
+      difficultyText.textContent = difficulty.toUpperCase().replace('-', ' ');
+      difficultyText.style.color = color;
+      difficultySlider.style.setProperty('--slider-color', color);
     });
-
-    // Trigger initial difficulty update
-    difficultySlider.dispatchEvent(new Event('input'));
 
     // Save Button
     saveButton.addEventListener('click', () => {
-      localStorage.setItem('gameDifficulty', difficultySlider.value);
+      const selectedDifficulty = difficulties[parseInt(difficultySlider.value)];
+      
+      localStorage.setItem('gameSpeed', speedSlider.value);
+      localStorage.setItem('gameDifficulty', selectedDifficulty);
       
       // Show save confirmation
       saveButton.textContent = 'Saved!';
@@ -240,6 +271,57 @@
     const highScoresModal = document.getElementById('highScoresModal');
     const closeHighScoresBtn = highScoresModal.querySelector('.close-modal');
     const scoresGrid = document.querySelector('.scores-grid');
+    const resetScoresBtn = document.getElementById('resetScores');
+
+    // Function to reset all high scores
+    function resetHighScores() {
+        if (confirm('Are you sure you want to reset all high scores? This cannot be undone.')) {
+            difficulties.forEach(difficulty => {
+                localStorage.removeItem(`highScore_${difficulty}`);
+            });
+            updateHighScoresDisplay();
+        }
+    }
+
+    // Add reset button event listener
+    resetScoresBtn.addEventListener('click', resetHighScores);
+
+    // Function to update high scores display
+    function updateHighScoresDisplay() {
+        scoresGrid.innerHTML = '';
+        
+        // Create header
+        const header = document.createElement('div');
+        header.className = 'scores-header';
+        header.innerHTML = `
+            <div class="difficulty-column">DIFFICULTY</div>
+            <div class="score-column">HIGH SCORE</div>
+        `;
+        scoresGrid.appendChild(header);
+        
+        // Add scores for each difficulty
+        difficulties.forEach(difficulty => {
+            const score = localStorage.getItem(`highScore_${difficulty}`) || '0';
+            const color = difficultyColors[difficulty];
+            
+            const scoreEntry = document.createElement('div');
+            scoreEntry.className = 'score-entry';
+            
+            scoreEntry.innerHTML = `
+                <div class="difficulty-column" style="color: ${color}">
+                    ${difficulty.toUpperCase().replace('-', ' ')}
+                </div>
+                <div class="score-column">
+                    ${score}
+                </div>
+            `;
+            
+            scoresGrid.appendChild(scoreEntry);
+        });
+    }
+
+    // Update high scores when opening modal
+    document.querySelector('.menu-item[onclick*="highScoresModal"]').addEventListener('click', updateHighScoresDisplay);
 
     // Close high scores modal
     closeHighScoresBtn.addEventListener('click', () => {
@@ -253,33 +335,52 @@
       }
     });
 
-    // Function to update high scores display
-    function updateHighScoresDisplay() {
-      scoresGrid.innerHTML = '';
-      
-      for (let difficulty = 1; difficulty <= 10; difficulty++) {
-        const score = localStorage.getItem(`highScore_${difficulty}`) || '0';
-        const difficultyLabel = difficultyLabels[difficulty];
-        
-        const scoreEntry = document.createElement('div');
-        scoreEntry.className = 'score-entry';
-        scoreEntry.dataset.difficulty = difficulty;
-        
-        scoreEntry.innerHTML = `
-          <div class="difficulty-header" style="color: ${difficultyColors[difficulty]}">
-            ${difficultyLabel} [${difficulty}]
-          </div>
-          <div class="score-value">
-            ${score}
-          </div>
-        `;
-        
-        scoresGrid.appendChild(scoreEntry);
-      }
-    }
+    // Add some CSS styles for the high scores grid
+    const style = document.createElement('style');
+    style.textContent = `
+        .scores-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px;
+            font-family: 'Press Start 2P', cursive;
+            max-width: 600px;
+            margin: 0 auto;
+        }
 
-    // Update high scores when opening modal
-    document.querySelector('.menu-item[onclick*="highScoresModal"]').addEventListener('click', updateHighScoresDisplay);
+        .scores-header {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 2px solid #fff;
+            margin-bottom: 10px;
+        }
+
+        .score-entry {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .score-entry:hover {
+            transform: scale(1.02);
+            box-shadow: 0 0 15px rgba(255, 217, 61, 0.2);
+        }
+
+        .difficulty-column {
+            flex: 2;
+            text-align: left;
+        }
+
+        .score-column {
+            flex: 1;
+            text-align: right;
+        }
+    `;
+    document.head.appendChild(style);
   </script>
 </body>
 </html> 

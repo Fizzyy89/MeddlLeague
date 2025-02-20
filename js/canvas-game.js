@@ -11,6 +11,11 @@ class CanvasGame {
         this.bgCanvas = document.getElementById('bgCanvas');
         this.bgCtx = this.bgCanvas.getContext('2d');
         
+        // Add timing and interpolation properties
+        this.frameCount = 0;
+        this.frameTimes = new Array(60).fill(0); // For FPS smoothing
+        this.rafId = null;
+        
         // Initialize background effect arrays
         this.backgroundEmojis = [];
         this.particles = [];
@@ -18,6 +23,10 @@ class CanvasGame {
         // Base dimensions (logical size)
         this.baseWidth = (GRID_X * (BLOCK_SIZE + GAP)) + (GRID_PADDING * 2);
         this.baseHeight = (GRID_Y * (BLOCK_SIZE + GAP)) + (GRID_PADDING * 2);
+        
+        // Get saved settings
+        const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
+        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'normal';
         
         // Game state initialization
         this.grid = [];
@@ -28,8 +37,36 @@ class CanvasGame {
         this.gameOver = false;
         this.elements = ['fire', 'water', 'earth', 'air', 'heart'];
         
-        // Load high score
-        this.highScore = parseInt(localStorage.getItem('highScore')) || 0;
+        // Load high score for current difficulty
+        const difficultyKey = `highScore_${savedDifficulty}`;
+        this.highScore = parseInt(localStorage.getItem(difficultyKey)) || 0;
+        document.getElementById('highScoreValue').textContent = this.highScore;
+        
+        // Initialize timer state
+        this.timerState = {
+            startTime: performance.now(),
+            currentTime: 0,
+            isRunning: false
+        };
+
+        // Difficulty multipliers for speed increase
+        this.difficultyMultipliers = {
+            'very-easy': 0.3,   // Speed increases 30% slower than normal
+            'easy': 0.6,        // Speed increases 60% slower than normal
+            'normal': 1.0,      // Normal speed increase
+            'hard': 1.5,        // Speed increases 50% faster than normal
+            'very-hard': 2.0    // Speed increases twice as fast
+        };
+
+        // Speed progression tracking
+        this.speedState = {
+            initialSpeed: savedSpeed,
+            currentSpeed: savedSpeed,
+            difficulty: savedDifficulty,
+            lastSpeedIncrease: performance.now(),
+            baseIncreaseInterval: 30000,
+            baseSpeedIncrease: 1
+        };
         
         // Falling state tracking
         this.fallingBlocks = new Set();
@@ -40,7 +77,7 @@ class CanvasGame {
         this.risingState = {
             offset: 0,
             startTime: performance.now(),
-            speed: 0.1,  // Blocks per second (0.1 = one block every 10 seconds)
+            speed: this.calculateRisingSpeed(this.speedState.currentSpeed),
             nextRow: [],
             previewRow: []
         };
@@ -48,23 +85,6 @@ class CanvasGame {
         // Initialize scale and resize
         this.scale = 1;
         this.resize();
-        
-        // Initialize game components in order
-        this.initGrid();                // First create the grid
-        this.generatePreviewRow();      // Then generate preview row
-        this.setupEventListeners();     // Set up input handlers
-        
-        // Add swap animation state
-        this.swapState = {
-            isAnimating: false,
-            startTime: 0,
-            duration: 200,  // Increased slightly for smoother animation
-            x1: 0,
-            x2: 0,
-            y: 0,
-            block1: null,
-            block2: null
-        };
         
         // Cache commonly used symbol mappings and colors
         this.blockSymbols = {
@@ -84,35 +104,6 @@ class CanvasGame {
             '⚡': '#FFD700',
             '🌀': '#6D28D9'
         };
-        
-        // RAF handling
-        this.rafId = null;
-        
-        // Add timing and interpolation properties
-        this.frameCount = 0;
-        this.frameTimes = new Array(60).fill(0); // For FPS smoothing
-        
-        // Initialize audio with debug logging
-        console.log('Setting up audio in CanvasGame');
-        this.initAudio();
-        
-        // Theme handling with debug logging
-        console.log('Setting up themes');
-        this.themeSelect = document.getElementById('themeSelect');
-        this.setupThemes();
-        
-        // Load saved theme
-        const savedTheme = localStorage.getItem('selectedTheme') || 'theme-elements';
-        console.log('Loading saved theme:', savedTheme);
-        this.themeSelect.value = savedTheme;
-        this.updateTheme(savedTheme);
-        
-        // Explicitly try to play music
-        console.log('Starting initial music');
-        audioManager.bgMusic.play().catch(err => console.error('Error starting music:', err));
-        
-        // Initialize background effects
-        this.initBackgroundEffects();
         
         // Add chain tracking
         this.chainCounter = 0;
@@ -136,8 +127,47 @@ class CanvasGame {
         this.dangerState = {
             active: false,
             startTime: 0,
-            warningDuration: 3000, // 3 seconds to clear the danger
+            warningDuration: 3000
         };
+
+        // Initialize game components in order
+        this.initGrid();                // First create the grid
+        this.generatePreviewRow();      // Then generate preview row
+        this.setupEventListeners();     // Set up input handlers
+        
+        // Add swap animation state
+        this.swapState = {
+            isAnimating: false,
+            startTime: 0,
+            duration: 200,  // Increased slightly for smoother animation
+            x1: 0,
+            x2: 0,
+            y: 0,
+            block1: null,
+            block2: null
+        };
+        
+        // Initialize audio
+        this.initAudio();
+        
+        // Setup themes
+        this.themeSelect = document.getElementById('themeSelect');
+        this.setupThemes();
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('selectedTheme') || 'theme-elements';
+        this.themeSelect.value = savedTheme;
+        this.updateTheme(savedTheme);
+        
+        // Initialize background effects
+        this.initBackgroundEffects();
+        
+        // Update displays
+        this.updateSpeedDisplay();
+        this.updateTimer(performance.now());
+        
+        // Start background music
+        audioManager.bgMusic.play().catch(console.error);
         
         // Start game loop
         this.rafId = requestAnimationFrame(() => this.gameLoop());
@@ -197,6 +227,10 @@ class CanvasGame {
                 }
             }
         }
+
+        // Start the timer when game starts
+        this.timerState.startTime = performance.now();
+        this.timerState.isRunning = true;
     }
     
     setupEventListeners() {
@@ -711,6 +745,15 @@ class CanvasGame {
         this.score += matchScore;
         document.getElementById('scoreValue').textContent = this.score;
 
+        // Check and update high score if needed
+        const difficultyKey = `highScore_${this.speedState.difficulty}`;
+        const currentHighScore = parseInt(localStorage.getItem(difficultyKey)) || 0;
+        if (this.score > currentHighScore) {
+            localStorage.setItem(difficultyKey, this.score);
+            this.highScore = this.score;
+            document.getElementById('highScoreValue').textContent = this.score;
+        }
+
         // First phase: Flash the blocks (800ms)
         matches.forEach(({x, y}) => {
             if (this.grid[y][x]) {
@@ -979,6 +1022,9 @@ class CanvasGame {
 
         const currentTime = performance.now();
         
+        // Update speed based on elapsed time and difficulty
+        this.updateGameSpeed(currentTime);
+        
         // Update and draw background effects
         this.updateBackgroundEffects(currentTime);
         this.drawBackgroundEffects();
@@ -995,6 +1041,9 @@ class CanvasGame {
         if (this.fallingBlocks.size === 0) {
             this.updateRising(currentTime);
         }
+        
+        // Update timer
+        this.updateTimer(currentTime);
         
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.save();
@@ -1249,15 +1298,21 @@ class CanvasGame {
     }
 
     showGameOver() {
-        // Update high score if needed
-        if (this.score > this.highScore) {
+        // Stop the timer
+        this.timerState.isRunning = false;
+
+        const difficultyKey = `highScore_${this.speedState.difficulty}`;
+        const currentHighScore = parseInt(localStorage.getItem(difficultyKey)) || 0;
+        
+        if (this.score > currentHighScore) {
+            localStorage.setItem(difficultyKey, this.score);
             this.highScore = this.score;
-            localStorage.setItem('highScore', this.highScore);
         }
         
         // Update modal content
         document.getElementById('finalScore').textContent = this.score;
-        document.getElementById('finalHighScore').textContent = this.highScore;
+        document.getElementById('finalHighScore').textContent = currentHighScore;
+        document.getElementById('finalDifficulty').textContent = this.speedState.difficulty.toUpperCase();
         
         // Show the modal
         const modal = document.getElementById('gameOverModal');
@@ -1267,6 +1322,10 @@ class CanvasGame {
     resetGame() {
         // Hide the modal
         document.getElementById('gameOverModal').style.display = 'none';
+        
+        // Get current saved speed setting
+        const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
+        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'normal';
         
         // Reset game state
         this.initGrid();
@@ -1285,11 +1344,15 @@ class CanvasGame {
             isFinalWarning: false
         };
         
-        // Reset rising state
+        // Reset speed state to initial values
+        this.speedState.currentSpeed = this.speedState.initialSpeed;
+        this.speedState.lastSpeedIncrease = performance.now();
+        
+        // Reset rising state with initial speed
         this.risingState = {
             offset: 0,
             startTime: performance.now(),
-            speed: 0.1,
+            speed: this.calculateRisingSpeed(this.speedState.currentSpeed),
             nextRow: [],
             previewRow: []
         };
@@ -1304,11 +1367,80 @@ class CanvasGame {
         // Reset UI
         document.getElementById('scoreValue').textContent = '0';
         
+        // Reset timer
+        this.timerState = {
+            startTime: performance.now(),
+            currentTime: 0,
+            isRunning: true
+        };
+        document.getElementById('gameTimer').textContent = '00:00';
+        
         // Clear any existing animation frame and restart the game loop
         if (this.rafId) {
             cancelAnimationFrame(this.rafId);
         }
         this.rafId = requestAnimationFrame(() => this.gameLoop());
+    }
+
+    calculateRisingSpeed(speedSetting) {
+        // Convert speed setting (1-50) to rows per second
+        // Speed 1: ~5 rows per minute (0.083 rows per second)
+        // Speed 25: ~25 rows per minute (0.417 rows per second)
+        // Speed 50: ~50 rows per minute (0.833 rows per second)
+        
+        const minSpeed = 0.083; // Speed 1
+        const maxSpeed = 0.833; // Speed 50
+        
+        // Linear interpolation between min and max speed
+        const speedFactor = (speedSetting - 1) / (50 - 1);
+        const rowsPerSecond = minSpeed + (maxSpeed - minSpeed) * speedFactor;
+        
+        return rowsPerSecond;
+    }
+
+    // Add method to update speed during gameplay
+    updateGameSpeed(currentTime) {
+        const multiplier = this.difficultyMultipliers[this.speedState.difficulty];
+        const interval = this.speedState.baseIncreaseInterval / multiplier;
+        
+        if (currentTime - this.speedState.lastSpeedIncrease >= interval) {
+            // Increase speed if not at max
+            if (this.speedState.currentSpeed < 50) {
+                this.speedState.currentSpeed += this.speedState.baseSpeedIncrease;
+                this.risingState.speed = this.calculateRisingSpeed(this.speedState.currentSpeed);
+                this.updateSpeedDisplay();
+            }
+            this.speedState.lastSpeedIncrease = currentTime;
+        }
+    }
+
+    updateSpeedDisplay() {
+        // Update the display in the info box
+        const currentDifficulty = document.getElementById('currentDifficulty');
+        const currentSpeed = document.getElementById('currentSpeed');
+        if (currentDifficulty && currentSpeed) {
+            currentDifficulty.textContent = this.speedState.difficulty.toUpperCase();
+            currentSpeed.textContent = this.speedState.currentSpeed;
+        }
+    }
+
+    updateTimer(currentTime) {
+        if (!this.timerState.isRunning) return;
+        
+        // Calculate elapsed time in seconds
+        const elapsedSeconds = Math.floor((currentTime - this.timerState.startTime) / 1000);
+        this.timerState.currentTime = elapsedSeconds;
+        
+        // Format time as MM:SS
+        const minutes = Math.floor(elapsedSeconds / 60);
+        const seconds = elapsedSeconds % 60;
+        const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Update display
+        const timerDisplay = document.getElementById('gameTimer');
+        if (timerDisplay) {
+            timerDisplay.textContent = formattedTime;
+        }
     }
 }
 
