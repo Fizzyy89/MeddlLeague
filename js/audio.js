@@ -5,7 +5,11 @@ class AudioManager {
     this.volumeSlider = document.getElementById('volumeSlider');
     this.muteBtn = document.getElementById('muteBtn');
     this.popSound = new Audio('sounds/pop.mp3');
+    this.altPopSound = new Audio('sounds/pop_dick.mp3');
     this.aiPopSound = new Audio('sounds/ai_pop.mp3');
+    
+    // Load saved sound preference
+    this.useAltPopSound = localStorage.getItem('useAltPopSound') === 'true';
     
     // If we found audio controls, initialize them
     if (this.bgMusic && this.volumeSlider && this.muteBtn) {
@@ -17,10 +21,17 @@ class AudioManager {
     this.chain2 = new Audio('sounds/chain2.mp3');
     this.chain3 = new Audio('sounds/chain3.mp3');
 
-    // Set volumes for chain sounds
-    this.chain1.volume = this.bgMusic.volume;
-    this.chain2.volume = this.bgMusic.volume;
-    this.chain3.volume = this.bgMusic.volume;
+    // Add match size sounds
+    this.match4 = new Audio('sounds/4blocks.mp3');
+    this.match5 = new Audio('sounds/5blocks.mp3');
+    this.match6 = new Audio('sounds/6blocks.mp3');
+
+    // Set volumes for all sound effects
+    const savedVolume = localStorage.getItem('volume') || 0.3;
+    [this.chain1, this.chain2, this.chain3, 
+     this.match4, this.match5, this.match6].forEach(sound => {
+      sound.volume = savedVolume;
+    });
   }
 
   init() {
@@ -37,8 +48,10 @@ class AudioManager {
     
     // Initial setup for sound effects
     this.popSound.volume = savedVolume * 0.2;
+    this.altPopSound.volume = savedVolume * 0.2;
     this.aiPopSound.volume = savedVolume * 0.2;
     this.popSound.muted = savedMuted;
+    this.altPopSound.muted = savedMuted;
     this.aiPopSound.muted = savedMuted;
     
     // Set up UI controls if they exist
@@ -46,6 +59,16 @@ class AudioManager {
       this.volumeSlider.value = savedVolume;
       this.muteBtn.textContent = savedMuted ? '🔇' : '🔊';
       this.setupEventListeners();
+    }
+
+    // Set up alt pop sound checkbox
+    const altSoundCheckbox = document.getElementById('useAltPopSound');
+    if (altSoundCheckbox) {
+      altSoundCheckbox.checked = this.useAltPopSound;
+      altSoundCheckbox.addEventListener('change', (e) => {
+        this.useAltPopSound = e.target.checked;
+        localStorage.setItem('useAltPopSound', this.useAltPopSound);
+      });
     }
     
     // Try to play initial music if it exists
@@ -61,6 +84,7 @@ class AudioManager {
       const newVolume = e.target.value;
       if (this.bgMusic) this.bgMusic.volume = newVolume;
       this.popSound.volume = newVolume * 0.2;
+      this.altPopSound.volume = newVolume * 0.2;
       this.aiPopSound.volume = newVolume * 0.2;
       localStorage.setItem('volume', newVolume);
       this.muteBtn.textContent = newVolume === '0' ? '🔇' : '🔊';
@@ -70,6 +94,7 @@ class AudioManager {
       const newMutedState = !this.isMuted();
       if (this.bgMusic) this.bgMusic.muted = newMutedState;
       this.popSound.muted = newMutedState;
+      this.altPopSound.muted = newMutedState;
       this.aiPopSound.muted = newMutedState;
       localStorage.setItem('muted', newMutedState);
       this.muteBtn.textContent = newMutedState ? '🔇' : '🔊';
@@ -103,7 +128,13 @@ class AudioManager {
   playPopSound(isAI = false) {
     if (this.isMuted()) return;
     
-    const sound = isAI ? this.aiPopSound : this.popSound;
+    let sound;
+    if (isAI) {
+      sound = this.aiPopSound;
+    } else {
+      sound = this.useAltPopSound ? this.altPopSound : this.popSound;
+    }
+    
     const clone = sound.cloneNode();
     clone.volume = (this.bgMusic ? this.bgMusic.volume : localStorage.getItem('volume')) * 0.3;
     clone.play().catch(console.log);
@@ -120,9 +151,32 @@ class AudioManager {
     // Update all audio volumes
     this.bgMusic.volume = volume;
     this.popSound.volume = volume;
+    this.altPopSound.volume = volume;
     this.chain1.volume = volume;
     this.chain2.volume = volume;
     this.chain3.volume = volume;
+    this.match4.volume = volume;
+    this.match5.volume = volume;
+    this.match6.volume = volume;
+  }
+
+  // Add new method to play match size sounds
+  playMatchSound(matchSize) {
+    if (this.isMuted()) return;
+
+    let sound;
+    if (matchSize === 4) {
+      sound = this.match4;
+    } else if (matchSize === 5) {
+      sound = this.match5;
+    } else if (matchSize >= 6) {
+      sound = this.match6;
+    }
+
+    if (sound) {
+      sound.currentTime = 0;
+      sound.play().catch(console.error);
+    }
   }
 }
 

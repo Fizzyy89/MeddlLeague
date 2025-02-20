@@ -710,6 +710,9 @@ class CanvasGame {
             clearTimeout(this.chainTimer);
         }
 
+        // Play match size sound effect
+        audioManager.playMatchSound(matches.length);
+
         // Increment chain counter if this is part of a chain
         if (isChain) {
             this.chainCounter++;

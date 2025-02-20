@@ -111,6 +111,16 @@
           ⚠️ Warning: At these speeds, glitches may occur more frequently
         </div>
 
+        <div class="option-group look-feel-section">
+          <h2>LOOK & FEEL</h2>
+          <div class="checkbox-option">
+            <label for="useAltPopSound">
+              <input type="checkbox" id="useAltPopSound">
+              Use 'Dick' pop sound
+            </label>
+          </div>
+        </div>
+
         <button id="saveOptions" class="save-button">SAVE CHANGES</button>
       </div>
     </div>
@@ -193,6 +203,12 @@
     
     // Set initial difficulty button
     difficultySlider.value = difficulties.indexOf(savedDifficulty);
+    
+    // Update initial difficulty text and color
+    const difficultyText = document.getElementById('difficultyText');
+    difficultyText.textContent = savedDifficulty.toUpperCase().replace('-', ' ');
+    difficultyText.style.color = difficultyColors[savedDifficulty];
+    difficultySlider.style.setProperty('--slider-color', difficultyColors[savedDifficulty]);
 
     // Close button functionality
     closeModalBtns.forEach(btn => {
@@ -224,7 +240,6 @@
       const color = difficultyColors[difficulty];
       
       // Update difficulty text and color
-      const difficultyText = document.getElementById('difficultyText');
       difficultyText.textContent = difficulty.toUpperCase().replace('-', ' ');
       difficultyText.style.color = color;
       difficultySlider.style.setProperty('--slider-color', color);
