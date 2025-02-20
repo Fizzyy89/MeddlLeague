@@ -1265,3 +1265,32 @@ input[type="range"]::-webkit-slider-thumb {
   opacity: 0.8;
   margin-top: 10px;
 }
+
+.canvas-container {
+    padding: 15px;
+    border: 2px solid #4a4a4a;
+    border-radius: 15px;
+    display: inline-block;
+    margin-top: 70px;
+    max-width: 95vw;  /* Limit width to 95% of viewport width */
+    max-height: 90vh; /* Limit height to 90% of viewport height */
+    box-sizing: border-box;
+}
+
+#gameCanvas {
+    border-radius: 15px;
+    background: rgba(0,0,0,0.3);
+    box-shadow: 0 0 30px rgba(255,87,184,0.2);
+    display: block;
+    max-width: 100%;
+    max-height: calc(90vh - 30px); /* Account for container padding */
+    height: auto;
+    margin: 0 auto; /* Center the canvas */
+}
+
+/* Add media query for large screens */
+@media (min-width: 1440px) and (min-height: 900px) {
+    .canvas-container {
+        margin-top: 5vh; /* Adjust top margin for better vertical centering */
+    }
+}
