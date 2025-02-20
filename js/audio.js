@@ -11,6 +11,16 @@ class AudioManager {
     if (this.bgMusic && this.volumeSlider && this.muteBtn) {
       this.init();
     }
+
+    // Add chain sounds
+    this.chain1 = new Audio('sounds/chain1.mp3');
+    this.chain2 = new Audio('sounds/chain2.mp3');
+    this.chain3 = new Audio('sounds/chain3.mp3');
+
+    // Set volumes for chain sounds
+    this.chain1.volume = this.bgMusic.volume;
+    this.chain2.volume = this.bgMusic.volume;
+    this.chain3.volume = this.bgMusic.volume;
   }
 
   init() {
@@ -97,6 +107,22 @@ class AudioManager {
     const clone = sound.cloneNode();
     clone.volume = (this.bgMusic ? this.bgMusic.volume : localStorage.getItem('volume')) * 0.3;
     clone.play().catch(console.log);
+  }
+
+  playSound(soundName) {
+    if (this[soundName]) {
+      this[soundName].currentTime = 0;
+      this[soundName].play();
+    }
+  }
+
+  updateVolume(volume) {
+    // Update all audio volumes
+    this.bgMusic.volume = volume;
+    this.popSound.volume = volume;
+    this.chain1.volume = volume;
+    this.chain2.volume = volume;
+    this.chain3.volume = volume;
   }
 }
 

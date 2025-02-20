@@ -28,6 +28,9 @@ class CanvasGame {
         this.gameOver = false;
         this.elements = ['fire', 'water', 'earth', 'air', 'heart'];
         
+        // Load high score
+        this.highScore = parseInt(localStorage.getItem('highScore')) || 0;
+        
         // Falling state tracking
         this.fallingBlocks = new Set();
         this.lastFrameTime = performance.now();
@@ -129,6 +132,13 @@ class CanvasGame {
             value: 0
         };
         
+        // Add danger state tracking
+        this.dangerState = {
+            active: false,
+            startTime: 0,
+            warningDuration: 3000, // 3 seconds to clear the danger
+        };
+        
         // Start game loop
         this.rafId = requestAnimationFrame(() => this.gameLoop());
     }
@@ -192,7 +202,12 @@ class CanvasGame {
     setupEventListeners() {
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
-            if (this.isSwapping || this.gameOver) return;
+            if (this.isSwapping || this.gameOver) {
+                if (e.code === 'Space' && this.gameOver) {
+                    this.resetGame();
+                }
+                return;
+            }
             
             switch(e.key) {
                 case 'ArrowLeft':
@@ -215,6 +230,7 @@ class CanvasGame {
         
         // Updated mouse controls with scaling and rising offset
         this.canvas.addEventListener('mousemove', (e) => {
+            if (this.gameOver) return;
             const rect = this.canvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) / this.scale - GRID_PADDING;
             const y = (e.clientY - rect.top) / this.scale - GRID_PADDING;
@@ -233,6 +249,11 @@ class CanvasGame {
             if (!this.isSwapping && !this.gameOver) {
                 this.swapBlocks();
             }
+        });
+
+        // Try Again button click handler
+        document.getElementById('tryAgainBtn').addEventListener('click', () => {
+            this.resetGame();
         });
     }
     
@@ -271,6 +292,26 @@ class CanvasGame {
         const yPos = Math.round(GRID_PADDING + (drawY * (BLOCK_SIZE + GAP)));
         const centerX = Math.round(xPos + (BLOCK_SIZE/2));
         const centerY = Math.round(yPos + (BLOCK_SIZE/2));
+        
+        // Add danger animation for ALL blocks when in final warning
+        if (this.dangerState.active && this.dangerState.isFinalWarning) {
+            const dangerProgress = (currentTime - this.dangerState.startTime) / 300; // 300ms per pulse
+            const dangerPulse = Math.sin(dangerProgress * Math.PI * 2) * 0.3 + 0.7;
+            
+            this.ctx.save();
+            this.ctx.shadowColor = 'red';
+            this.ctx.shadowBlur = 20;
+            this.ctx.globalAlpha *= dangerPulse;
+        } else if (y < 3 && this.dangerState.active) {
+            // Normal danger state for top 3 rows
+            const dangerProgress = (currentTime - this.dangerState.startTime) / 300;
+            const dangerPulse = Math.sin(dangerProgress * Math.PI * 2) * 0.3 + 0.7;
+            
+            this.ctx.save();
+            this.ctx.shadowColor = 'red';
+            this.ctx.shadowBlur = 20;
+            this.ctx.globalAlpha *= dangerPulse;
+        }
         
         // Draw block background with animation effects
         this.ctx.fillStyle = this.getBlockColor(blockType);
@@ -354,6 +395,11 @@ class CanvasGame {
         // Reset transformations
         if (blockState === 'popping') {
             this.ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
+        }
+
+        if ((this.dangerState.active && this.dangerState.isFinalWarning) || 
+            (y < 3 && this.dangerState.active)) {
+            this.ctx.restore();
         }
     }
     
@@ -633,6 +679,15 @@ class CanvasGame {
         // Increment chain counter if this is part of a chain
         if (isChain) {
             this.chainCounter++;
+            
+            // Play chain sound based on chain level
+            if (this.chainCounter === 1) {
+                audioManager.playSound('chain1');
+            } else if (this.chainCounter === 2) {
+                audioManager.playSound('chain2');
+            } else if (this.chainCounter >= 3) {
+                audioManager.playSound('chain3');
+            }
             
             // Activate chain display
             this.chainDisplay = {
@@ -918,6 +973,10 @@ class CanvasGame {
     }
     
     gameLoop() {
+        if (this.gameOver) {
+            return;  // Just return if game is over, modal will handle the display
+        }
+
         const currentTime = performance.now();
         
         // Update and draw background effects
@@ -960,6 +1019,9 @@ class CanvasGame {
         
         this.lastFrameTime = currentTime;
         this.rafId = requestAnimationFrame(() => this.gameLoop());
+        
+        // Check danger state after updates
+        this.checkDangerState();
     }
 
     setupThemes() {
@@ -1157,6 +1219,96 @@ class CanvasGame {
             this.bgCtx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
             this.bgCtx.fill();
         }
+    }
+
+    checkDangerState() {
+        // Check top row for blocks
+        const hasBlocksAtTop = this.grid[0].some(block => block !== null);
+        
+        if (hasBlocksAtTop && !this.dangerState.active) {
+            // Stop rising and enter final danger state
+            this.risingState.speed = 0;
+            this.dangerState = {
+                active: true,
+                startTime: performance.now(),
+                warningDuration: 2000, // 2 seconds to clear the top
+                isFinalWarning: true
+            };
+        } else if (hasBlocksAtTop && this.dangerState.active && this.dangerState.isFinalWarning) {
+            // Check if time's up during final warning
+            const timeInDanger = performance.now() - this.dangerState.startTime;
+            if (timeInDanger >= this.dangerState.warningDuration) {
+                this.gameOver = true;
+                this.showGameOver();  // Show the game over modal
+            }
+        } else if (!hasBlocksAtTop && this.dangerState.active && this.dangerState.isFinalWarning) {
+            // Player cleared the top row in time
+            this.dangerState.active = false;
+            this.risingState.speed = 0.1; // Resume normal rising speed
+        }
+    }
+
+    showGameOver() {
+        // Update high score if needed
+        if (this.score > this.highScore) {
+            this.highScore = this.score;
+            localStorage.setItem('highScore', this.highScore);
+        }
+        
+        // Update modal content
+        document.getElementById('finalScore').textContent = this.score;
+        document.getElementById('finalHighScore').textContent = this.highScore;
+        
+        // Show the modal
+        const modal = document.getElementById('gameOverModal');
+        modal.style.display = 'block';
+    }
+
+    resetGame() {
+        // Hide the modal
+        document.getElementById('gameOverModal').style.display = 'none';
+        
+        // Reset game state
+        this.initGrid();
+        this.score = 0;
+        this.gameOver = false;
+        this.isSwapping = false;
+        this.fallingBlocks.clear();
+        this.chainCounter = 0;
+        this.fallingFromChain = false;
+        
+        // Reset danger state
+        this.dangerState = {
+            active: false,
+            startTime: 0,
+            warningDuration: 2000,
+            isFinalWarning: false
+        };
+        
+        // Reset rising state
+        this.risingState = {
+            offset: 0,
+            startTime: performance.now(),
+            speed: 0.1,
+            nextRow: [],
+            previewRow: []
+        };
+        
+        // Generate new preview row
+        this.generatePreviewRow();
+        
+        // Reset cursor position
+        this.cursorX = 0;
+        this.cursorY = 0;
+        
+        // Reset UI
+        document.getElementById('scoreValue').textContent = '0';
+        
+        // Clear any existing animation frame and restart the game loop
+        if (this.rafId) {
+            cancelAnimationFrame(this.rafId);
+        }
+        this.rafId = requestAnimationFrame(() => this.gameLoop());
     }
 }
 
