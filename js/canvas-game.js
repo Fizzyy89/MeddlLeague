@@ -1327,6 +1327,16 @@ class CanvasGame {
         const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
         const savedDifficulty = localStorage.getItem('gameDifficulty') || 'normal';
         
+        // Update speed state with saved values
+        this.speedState = {
+            initialSpeed: savedSpeed,
+            currentSpeed: savedSpeed,
+            difficulty: savedDifficulty,
+            lastSpeedIncrease: performance.now(),
+            baseIncreaseInterval: 30000,
+            baseSpeedIncrease: 1
+        };
+        
         // Reset game state
         this.initGrid();
         this.score = 0;
@@ -1344,15 +1354,11 @@ class CanvasGame {
             isFinalWarning: false
         };
         
-        // Reset speed state to initial values
-        this.speedState.currentSpeed = this.speedState.initialSpeed;
-        this.speedState.lastSpeedIncrease = performance.now();
-        
-        // Reset rising state with initial speed
+        // Reset rising state with correct initial speed
         this.risingState = {
             offset: 0,
             startTime: performance.now(),
-            speed: this.calculateRisingSpeed(this.speedState.currentSpeed),
+            speed: this.calculateRisingSpeed(savedSpeed),
             nextRow: [],
             previewRow: []
         };
@@ -1374,6 +1380,9 @@ class CanvasGame {
             isRunning: true
         };
         document.getElementById('gameTimer').textContent = '00:00';
+        
+        // Update the speed display
+        this.updateSpeedDisplay();
         
         // Clear any existing animation frame and restart the game loop
         if (this.rafId) {

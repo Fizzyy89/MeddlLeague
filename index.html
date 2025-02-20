@@ -230,11 +230,26 @@
       difficultySlider.style.setProperty('--slider-color', color);
     });
 
+    // Speed Controls
+    speedSlider.addEventListener('input', (e) => {
+      const speed = parseInt(e.target.value);
+      speedValue.textContent = speed;
+      speedValue.style.color = speedColors[getClosestSpeedKey(speed)];
+      speedText.textContent = getSpeedText(speed);
+      speedText.style.color = speedColors[getClosestSpeedKey(speed)];
+      speedSlider.style.setProperty('--slider-color', speedColors[getClosestSpeedKey(speed)]);
+      
+      // Show warning for high speeds
+      const warningBox = document.getElementById('difficultyWarning');
+      warningBox.style.display = speed >= 30 ? 'block' : 'none';
+    });
+
     // Save Button
     saveButton.addEventListener('click', () => {
       const selectedDifficulty = difficulties[parseInt(difficultySlider.value)];
+      const selectedSpeed = parseInt(speedSlider.value);
       
-      localStorage.setItem('gameSpeed', speedSlider.value);
+      localStorage.setItem('gameSpeed', selectedSpeed);
       localStorage.setItem('gameDifficulty', selectedDifficulty);
       
       // Show save confirmation
