@@ -111,6 +111,24 @@ class CanvasGame {
         // Initialize background effects
         this.initBackgroundEffects();
         
+        // Add chain tracking
+        this.chainCounter = 0;
+        this.chainTimer = null;
+        
+        // Add floating scores array
+        this.floatingScores = [];
+        
+        // Add flag to track if blocks are falling from a chain
+        this.fallingFromChain = false;
+        
+        // Add chain display state
+        this.chainDisplay = {
+            active: false,
+            startTime: 0,
+            duration: 1000,
+            value: 0
+        };
+        
         // Start game loop
         this.rafId = requestAnimationFrame(() => this.gameLoop());
     }
@@ -372,12 +390,14 @@ class CanvasGame {
         const block1 = this.grid[y][x1];
         const block2 = this.grid[y][x2];
         
-        // Check if either block is in matching state
-        const isBlock1Matching = block1 && typeof block1 === 'object' && block1.state === 'matching';
-        const isBlock2Matching = block2 && typeof block2 === 'object' && block2.state === 'matching';
+        // Check if either block is in matching, popping, or falling state
+        const isBlock1Locked = block1 && typeof block1 === 'object' && 
+            (block1.state === 'matching' || block1.state === 'popping' || block1.state === 'falling');
+        const isBlock2Locked = block2 && typeof block2 === 'object' && 
+            (block2.state === 'matching' || block2.state === 'popping' || block2.state === 'falling');
         
-        // Don't allow swapping if either block is currently matching
-        if (isBlock1Matching || isBlock2Matching) {
+        // Don't allow swapping if either block is locked or if any blocks are falling
+        if (isBlock1Locked || isBlock2Locked || this.fallingBlocks.size > 0) {
             return;
         }
         
@@ -472,14 +492,169 @@ class CanvasGame {
         });
     }
     
-    removeMatches(matches) {
-        if (matches.length === 0) {
-            this.isSwapping = false;
+    calculateMatchScore(matchSize, chainLevel) {
+        // Base score based on match size
+        let baseScore;
+        if (matchSize === 3) baseScore = 30;
+        else if (matchSize === 4) baseScore = 50;
+        else if (matchSize === 5) baseScore = 70;
+        else baseScore = 90; // 6 or more
+
+        // Chain multiplier (2^chainLevel: 1, 2, 4, 8, 16, etc.)
+        const multiplier = chainLevel > 0 ? Math.pow(2, chainLevel) : 1;
+        
+        return baseScore * multiplier;
+    }
+
+    addFloatingScore(x, y, baseScore, chainLevel) {
+        const multiplier = chainLevel > 0 ? Math.pow(2, chainLevel) : 1;
+        const totalScore = baseScore * multiplier;
+        
+        // Calculate screen position
+        const screenX = GRID_PADDING + (x * (BLOCK_SIZE + GAP)) + BLOCK_SIZE/2;
+        const screenY = GRID_PADDING + (y * (BLOCK_SIZE + GAP));
+        
+        this.floatingScores.push({
+            baseScore,
+            multiplier,
+            totalScore,
+            x: screenX,
+            y: screenY,
+            startTime: performance.now(),
+            duration: 1000, // 1 second animation
+            opacity: 1
+        });
+    }
+
+    drawFloatingScores(currentTime) {
+        this.floatingScores = this.floatingScores.filter(score => {
+            const progress = (currentTime - score.startTime) / score.duration;
+            if (progress >= 1) return false;
+            
+            const y = score.y - (progress * 50); // Float upward
+            const opacity = 1 - progress;
+            
+            this.ctx.save();
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'bottom';
+            this.ctx.fillStyle = `rgba(255,255,255,${opacity})`;
+            
+            if (score.multiplier > 1) {
+                // Draw chain multiplier
+                this.ctx.font = 'bold 24px "Press Start 2P"';
+                this.ctx.fillStyle = `rgba(255,220,0,${opacity})`;
+                this.ctx.fillText(`×${score.multiplier}`, score.x, y - 20);
+                
+                // Draw base score
+                this.ctx.font = '20px "Press Start 2P"';
+                this.ctx.fillStyle = `rgba(255,255,255,${opacity})`;
+                this.ctx.fillText(`${score.baseScore}`, score.x, y);
+                
+                // Draw total score
+                this.ctx.font = 'bold 28px "Press Start 2P"';
+                this.ctx.fillStyle = `rgba(255,180,0,${opacity})`;
+                this.ctx.fillText(`${score.totalScore}`, score.x, y + 30);
+            } else {
+                // Just draw the score for non-chain matches
+                this.ctx.font = 'bold 24px "Press Start 2P"';
+                this.ctx.fillText(`${score.baseScore}`, score.x, y);
+            }
+            
+            this.ctx.restore();
+            return true;
+        });
+    }
+
+    drawChainIndicator(currentTime) {
+        if (!this.chainDisplay.active) return;
+        
+        const progress = (currentTime - this.chainDisplay.startTime) / this.chainDisplay.duration;
+        if (progress >= 1) {
+            this.chainDisplay.active = false;
             return;
         }
 
-        // Update score
-        this.score += matches.length * 100;
+        // Scale up quickly then slowly fade out
+        const scale = progress < 0.3 
+            ? 1 + (progress * 3.33) // Scale up in first 30%
+            : 2 - (progress * 0.5); // Slowly scale down
+            
+        const opacity = progress < 0.3 
+            ? 1 
+            : 1 - ((progress - 0.3) / 0.7); // Fade out after peak
+
+        this.ctx.save();
+        
+        // Center of the game area
+        const centerX = this.baseWidth / 2;
+        const centerY = this.baseHeight / 2;
+        
+        this.ctx.translate(centerX, centerY);
+        this.ctx.scale(scale, scale);
+        
+        // Draw chain number
+        this.ctx.font = 'bold 48px "Press Start 2P"';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        
+        // Glow effect
+        this.ctx.shadowColor = 'rgba(255, 220, 0, 0.8)';
+        this.ctx.shadowBlur = 20;
+        
+        // Main text
+        this.ctx.fillStyle = `rgba(255, 220, 0, ${opacity})`;
+        this.ctx.fillText(`CHAIN`, 0, -30);
+        this.ctx.fillText(`×${Math.pow(2, this.chainDisplay.value)}`, 0, 30);
+        
+        // Outline
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+        this.ctx.strokeText(`CHAIN`, 0, -30);
+        this.ctx.strokeText(`×${Math.pow(2, this.chainDisplay.value)}`, 0, 30);
+        
+        this.ctx.restore();
+    }
+
+    removeMatches(matches, isChain = false) {
+        if (matches.length === 0) {
+            this.isSwapping = false;
+            // Reset chain counter if no new matches
+            if (!isChain) {
+                this.chainCounter = 0;
+            }
+            return;
+        }
+
+        // Clear existing chain timer if it exists
+        if (this.chainTimer) {
+            clearTimeout(this.chainTimer);
+        }
+
+        // Increment chain counter if this is part of a chain
+        if (isChain) {
+            this.chainCounter++;
+            
+            // Activate chain display
+            this.chainDisplay = {
+                active: true,
+                startTime: performance.now(),
+                duration: 1000,
+                value: this.chainCounter
+            };
+        } else {
+            this.chainCounter = 0;
+        }
+
+        // Calculate score and add floating score display
+        const matchScore = this.calculateMatchScore(matches.length, this.chainCounter);
+        const baseScore = this.calculateMatchScore(matches.length, 0); // Score without chain multiplier
+        
+        // Add floating score at the center of the match
+        const centerMatch = matches[Math.floor(matches.length / 2)];
+        this.addFloatingScore(centerMatch.x, centerMatch.y, baseScore, this.chainCounter);
+        
+        this.score += matchScore;
+        document.getElementById('scoreValue').textContent = this.score;
 
         // First phase: Flash the blocks (800ms)
         matches.forEach(({x, y}) => {
@@ -494,10 +669,8 @@ class CanvasGame {
 
         // Second phase: Pop blocks one by one
         setTimeout(() => {
-            // Sort matches from top to bottom for natural pop sequence
             const sortedMatches = matches.sort((a, b) => a.y - b.y);
             
-            // Pop each block with a delay
             sortedMatches.forEach(({x, y}, index) => {
                 setTimeout(() => {
                     if (this.grid[y][x]) {
@@ -506,24 +679,27 @@ class CanvasGame {
                             state: 'popping',
                             animationStart: performance.now()
                         };
-                        // Play pop sound
                         audioManager.playPopSound();
                     }
-                }, index * 200); // Changed from 600 to 300
+                }, index * 200);
                 
-                // Remove block after pop animation
                 setTimeout(() => {
                     if (this.grid[y][x]) {
                         this.grid[y][x] = null;
                     }
                     
-                    // After last block is removed, start dropping
                     if (index === matches.length - 1) {
-                        this.dropBlocks();
+                        // After last block is removed, start dropping and check for chains
+                        this.dropBlocks(true); // Pass true to indicate checking for chains
                     }
-                }, index * 200 + 200); // Changed from 600 to 300
+                }, index * 200 + 200);
             });
-        }, 600); // Flash duration stays the same
+        }, 600);
+
+        // Set chain timer to reset counter if no new matches occur
+        this.chainTimer = setTimeout(() => {
+            this.chainCounter = 0;
+        }, 2000); // Reset chain if no new matches within 2 seconds
     }
     
     checkMatches() {
@@ -644,7 +820,10 @@ class CanvasGame {
         }
     }
     
-    dropBlocks() {
+    dropBlocks(checkForChains = false) {
+        // Set falling from chain flag
+        this.fallingFromChain = checkForChains;
+        
         let blocksFell = false;
         
         // Check each column from bottom to top
@@ -680,11 +859,17 @@ class CanvasGame {
             }
         }
         
-        if (blocksFell) {
-            this.isSwapping = true;  // Prevent new moves while blocks are falling
-        } else {
+        if (!blocksFell) {
             // If no blocks fell, check for matches
-            this.checkMatches();
+            const newMatches = this.findMatches();
+            if (newMatches.length > 0) {
+                // Only count as chain if we're checking for chains AND there was a previous match
+                const isChainMatch = checkForChains && this.chainCounter > 0;
+                this.removeMatches(newMatches, isChainMatch);
+            } else {
+                this.chainCounter = 0;
+                this.isSwapping = false;
+            }
         }
     }
     
@@ -717,9 +902,18 @@ class CanvasGame {
             }
         });
         
+        // Check for new matches after ALL blocks have landed
         if (allBlocksLanded && this.fallingBlocks.size === 0) {
-            // All blocks have landed, check for matches
-            this.checkMatches();
+            const newMatches = this.findMatches();
+            if (newMatches.length > 0) {
+                // Only count as chain if blocks were falling from a previous match
+                this.removeMatches(newMatches, this.fallingFromChain);
+            } else {
+                this.chainCounter = 0;
+                this.isSwapping = false;
+            }
+            // Reset the chain flag
+            this.fallingFromChain = false;
         }
     }
     
@@ -758,6 +952,8 @@ class CanvasGame {
         }
         
         this.drawPreviewRow();
+        this.drawFloatingScores(currentTime);
+        this.drawChainIndicator(currentTime);
         this.drawCursor();
         
         this.ctx.restore();
