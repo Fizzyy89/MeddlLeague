@@ -130,6 +130,10 @@ class CanvasGame {
             warningDuration: 3000
         };
 
+        // Add manual rising state
+        this.manualRising = false;
+        this.manualRisingSpeed = 1; // Increased from 0.8 to 1 for faster manual rising
+        
         // Initialize game components in order
         this.initGrid();                // First create the grid
         this.generatePreviewRow();      // Then generate preview row
@@ -259,6 +263,43 @@ class CanvasGame {
                 case ' ':
                     this.swapBlocks();
                     break;
+                case 'Shift':
+                    // Start manual rising when Shift is pressed
+                    this.manualRising = true;
+                    break;
+            }
+        });
+        
+        // Add key up handler for Shift
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'Shift') {
+                this.manualRising = false;
+            }
+        });
+
+        // Prevent context menu on right click
+        this.canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
+
+        // Handle right mouse button down
+        this.canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 2) { // Right mouse button
+                this.manualRising = true;
+            }
+        });
+
+        // Handle right mouse button up
+        this.canvas.addEventListener('mouseup', (e) => {
+            if (e.button === 2) { // Right mouse button
+                this.manualRising = false;
+            }
+        });
+
+        // Also stop manual rising if mouse leaves the canvas
+        this.canvas.addEventListener('mouseleave', () => {
+            if (this.manualRising) {
+                this.manualRising = false;
             }
         });
         
@@ -854,8 +895,16 @@ class CanvasGame {
         // Calculate elapsed time since last frame in seconds
         const deltaTime = (currentTime - this.lastFrameTime) / 1000;
         
-        // Calculate new offset based on constant speed
-        this.risingState.offset += this.risingState.speed * deltaTime;
+        // Only allow manual rising if not in danger state
+        const canManualRise = this.manualRising && !this.dangerState.active;
+        
+        // Use whichever speed is faster: manual or natural
+        const currentSpeed = canManualRise ? 
+            Math.max(this.manualRisingSpeed, this.risingState.speed) : 
+            this.risingState.speed;
+        
+        // Calculate new offset based on speed
+        this.risingState.offset += currentSpeed * deltaTime;
         
         // When offset reaches or exceeds 1, shift the grid up
         if (this.risingState.offset >= 1) {
