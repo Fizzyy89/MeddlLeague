@@ -1,181 +1,208 @@
 class AudioManager {
   constructor() {
-    // Find audio elements on the current page
+    // Volume settings with new defaults
+    this.masterVolume = parseFloat(localStorage.getItem('masterVolume') ?? '0.3');
+    this.musicVolume = parseFloat(localStorage.getItem('musicVolume') ?? '0.8');
+    this.sfxVolume = parseFloat(localStorage.getItem('sfxVolume') ?? '0.8');
+    this.musicMuted = localStorage.getItem('musicMuted') === 'true';
+    this.sfxMuted = localStorage.getItem('sfxMuted') === 'true';
+
+    // Background Music
     this.bgMusic = document.getElementById('bgMusic');
-    this.volumeSlider = document.getElementById('volumeSlider');
-    this.muteBtn = document.getElementById('muteBtn');
-    this.popSound = new Audio('sounds/pop.mp3');
-    this.altPopSound = new Audio('sounds/pop_dick.mp3');
-    this.aiPopSound = new Audio('sounds/ai_pop.mp3');
-    
+    if (this.bgMusic) {
+      this.bgMusic.volume = this.musicMuted ? 0 : this.masterVolume * this.musicVolume;
+    }
+
+    // Sound Effects
+    this.sounds = {
+      pop: new Audio('sounds/pop.mp3'),
+      altPop: new Audio('sounds/pop_dick.mp3'),
+      aiPop: new Audio('sounds/ai_pop.mp3'),
+      chain1: new Audio('sounds/chain1.mp3'),
+      chain2: new Audio('sounds/chain2.mp3'),
+      chain3: new Audio('sounds/chain3.mp3'),
+      match4: new Audio('sounds/4blocks.mp3'),
+      match5: new Audio('sounds/5blocks.mp3'),
+      match6: new Audio('sounds/6blocks.mp3')
+    };
+
+    // Initialize sound volumes
+    this.updateAllVolumes();
+
     // Load saved sound preference
     this.useAltPopSound = localStorage.getItem('useAltPopSound') === 'true';
+
+    // Find all volume controls
+    this.volumeSliders = {
+      master: document.getElementById('masterVolume'),
+      menu: document.getElementById('volumeSlider'),
+      game: document.querySelector('.game-container #volumeSlider')
+    };
     
-    // If we found audio controls, initialize them
-    if (this.bgMusic && this.volumeSlider && this.muteBtn) {
-      this.init();
-    }
+    this.muteBtns = {
+      master: document.getElementById('masterMuteBtn'),
+      menu: document.getElementById('muteBtn'),
+      game: document.querySelector('.game-container #muteBtn')
+    };
 
-    // Add chain sounds
-    this.chain1 = new Audio('sounds/chain1.mp3');
-    this.chain2 = new Audio('sounds/chain2.mp3');
-    this.chain3 = new Audio('sounds/chain3.mp3');
+    // Initialize all controls
+    this.initAllControls();
+  }
 
-    // Add match size sounds
-    this.match4 = new Audio('sounds/4blocks.mp3');
-    this.match5 = new Audio('sounds/5blocks.mp3');
-    this.match6 = new Audio('sounds/6blocks.mp3');
+  initAllControls() {
+    // Set initial values for all volume sliders
+    Object.values(this.volumeSliders).forEach(slider => {
+      if (slider) {
+        slider.value = this.masterVolume;
+      }
+    });
 
-    // Set volumes for all sound effects
-    const savedVolume = localStorage.getItem('volume') || 0.3;
-    [this.chain1, this.chain2, this.chain3, 
-     this.match4, this.match5, this.match6].forEach(sound => {
-      sound.volume = savedVolume;
+    // Set initial states for all mute buttons
+    Object.values(this.muteBtns).forEach(btn => {
+      if (btn) {
+        btn.textContent = this.masterVolume === 0 ? '🔇' : '🔊';
+      }
+    });
+
+    // Set up event listeners for all volume controls
+    this.setupAllEventListeners();
+  }
+
+  setupAllEventListeners() {
+    // Add input listeners to all volume sliders
+    Object.entries(this.volumeSliders).forEach(([key, slider]) => {
+      if (slider) {
+        slider.addEventListener('input', (e) => {
+          const newVolume = parseFloat(e.target.value);
+          this.setMasterVolume(newVolume);
+          this.syncAllControls();
+        });
+      }
+    });
+
+    // Add click listeners to all mute buttons
+    Object.entries(this.muteBtns).forEach(([key, btn]) => {
+      if (btn) {
+        btn.addEventListener('click', () => {
+          const newVolume = this.masterVolume === 0 ? 0.3 : 0;
+          this.setMasterVolume(newVolume);
+          this.syncAllControls();
+        });
+      }
     });
   }
 
-  init() {
-    console.log('Initializing AudioManager');
-    // Load saved volume settings
-    const savedVolume = localStorage.getItem('volume') || 0.3;
-    const savedMuted = localStorage.getItem('muted') === 'true';
-    
-    // Initial setup for background music
-    if (this.bgMusic) {
-      this.bgMusic.volume = savedVolume;
-      this.bgMusic.muted = savedMuted;
-    }
-    
-    // Initial setup for sound effects
-    this.popSound.volume = savedVolume * 0.2;
-    this.altPopSound.volume = savedVolume * 0.2;
-    this.aiPopSound.volume = savedVolume * 0.2;
-    this.popSound.muted = savedMuted;
-    this.altPopSound.muted = savedMuted;
-    this.aiPopSound.muted = savedMuted;
-    
-    // Set up UI controls if they exist
-    if (this.volumeSlider && this.muteBtn) {
-      this.volumeSlider.value = savedVolume;
-      this.muteBtn.textContent = savedMuted ? '🔇' : '🔊';
-      this.setupEventListeners();
+  syncAllControls() {
+    // Update all volume sliders
+    Object.values(this.volumeSliders).forEach(slider => {
+      if (slider) {
+        slider.value = this.masterVolume;
+      }
+    });
+
+    // Update all mute buttons
+    Object.values(this.muteBtns).forEach(btn => {
+      if (btn) {
+        btn.textContent = this.masterVolume === 0 ? '🔇' : '🔊';
+      }
+    });
+  }
+
+  updateAllVolumes() {
+    // Update music volume
+    if (this.bgMusic && !this.musicMuted) {
+      this.bgMusic.volume = this.masterVolume * this.musicVolume;
     }
 
-    // Set up alt pop sound checkbox
-    const altSoundCheckbox = document.getElementById('useAltPopSound');
-    if (altSoundCheckbox) {
-      altSoundCheckbox.checked = this.useAltPopSound;
-      altSoundCheckbox.addEventListener('change', (e) => {
-        this.useAltPopSound = e.target.checked;
-        localStorage.setItem('useAltPopSound', this.useAltPopSound);
+    // Update all sound effects
+    if (!this.sfxMuted) {
+      Object.values(this.sounds).forEach(sound => {
+        sound.volume = this.masterVolume * this.sfxVolume;
       });
     }
-    
-    // Try to play initial music if it exists
-    if (this.bgMusic) {
-      this.bgMusic.play().catch(err => console.error('Error playing initial music:', err));
+  }
+
+  setMasterVolume(volume) {
+    this.masterVolume = volume;
+    localStorage.setItem('masterVolume', volume);
+    this.updateAllVolumes();
+    this.syncAllControls();
+  }
+
+  setMusicVolume(volume) {
+    this.musicVolume = volume;
+    localStorage.setItem('musicVolume', volume);
+    if (this.bgMusic && !this.musicMuted) {
+      this.bgMusic.volume = this.masterVolume * this.musicVolume;
     }
   }
 
-  setupEventListeners() {
-    if (!this.volumeSlider || !this.muteBtn) return;
-
-    this.volumeSlider.addEventListener('input', (e) => {
-      const newVolume = e.target.value;
-      if (this.bgMusic) this.bgMusic.volume = newVolume;
-      this.popSound.volume = newVolume * 0.2;
-      this.altPopSound.volume = newVolume * 0.2;
-      this.aiPopSound.volume = newVolume * 0.2;
-      localStorage.setItem('volume', newVolume);
-      this.muteBtn.textContent = newVolume === '0' ? '🔇' : '🔊';
-    });
-
-    this.muteBtn.addEventListener('click', () => {
-      const newMutedState = !this.isMuted();
-      if (this.bgMusic) this.bgMusic.muted = newMutedState;
-      this.popSound.muted = newMutedState;
-      this.altPopSound.muted = newMutedState;
-      this.aiPopSound.muted = newMutedState;
-      localStorage.setItem('muted', newMutedState);
-      this.muteBtn.textContent = newMutedState ? '🔇' : '🔊';
-    });
+  setSFXVolume(volume) {
+    this.sfxVolume = volume;
+    localStorage.setItem('sfxVolume', volume);
+    if (!this.sfxMuted) {
+      Object.values(this.sounds).forEach(sound => {
+        sound.volume = this.masterVolume * this.sfxVolume;
+      });
+    }
   }
 
-  isMuted() {
-    return this.bgMusic ? this.bgMusic.muted : localStorage.getItem('muted') === 'true';
+  toggleMusicMute() {
+    this.musicMuted = !this.musicMuted;
+    localStorage.setItem('musicMuted', this.musicMuted);
+    if (this.bgMusic) {
+      this.bgMusic.volume = this.musicMuted ? 0 : this.masterVolume * this.musicVolume;
+    }
+    return this.musicMuted;
+  }
+
+  toggleSFXMute() {
+    this.sfxMuted = !this.sfxMuted;
+    localStorage.setItem('sfxMuted', this.sfxMuted);
+    this.updateAllVolumes();
+    return this.sfxMuted;
+  }
+
+  playSound(soundName) {
+    if (this.sfxMuted || !this.sounds[soundName]) return;
+    
+    const sound = this.sounds[soundName].cloneNode();
+    sound.volume = this.masterVolume * this.sfxVolume;
+    sound.play().catch(console.error);
+  }
+
+  playPopSound(isAI = false) {
+    if (this.sfxMuted) return;
+    
+    const soundName = isAI ? 'aiPop' : (this.useAltPopSound ? 'altPop' : 'pop');
+    this.playSound(soundName);
+  }
+
+  playMatchSound(matchSize) {
+    if (this.sfxMuted) return;
+
+    if (matchSize === 4) {
+      this.playSound('match4');
+    } else if (matchSize === 5) {
+      this.playSound('match5');
+    } else if (matchSize >= 6) {
+      this.playSound('match6');
+    }
   }
 
   updateThemeMusic(theme) {
     if (!this.bgMusic) return;
     
-    console.log('Updating theme music:', theme);
     const wasPlaying = !this.bgMusic.paused;
     const currentSrc = this.bgMusic.querySelector('source').src;
     const newSrc = `music/${theme.replace('theme-', '')}.mp3`;
     
-    console.log('Current src:', currentSrc);
-    console.log('New src:', newSrc);
-    
     if (!currentSrc.endsWith(newSrc)) {
       this.bgMusic.querySelector('source').src = newSrc;
       this.bgMusic.load();
-      if (wasPlaying || true) {
-        this.bgMusic.play().catch(err => console.error('Error playing music:', err));
+      if (wasPlaying) {
+        this.bgMusic.play().catch(console.error);
       }
-    }
-  }
-
-  playPopSound(isAI = false) {
-    if (this.isMuted()) return;
-    
-    let sound;
-    if (isAI) {
-      sound = this.aiPopSound;
-    } else {
-      sound = this.useAltPopSound ? this.altPopSound : this.popSound;
-    }
-    
-    const clone = sound.cloneNode();
-    clone.volume = (this.bgMusic ? this.bgMusic.volume : localStorage.getItem('volume')) * 0.3;
-    clone.play().catch(console.log);
-  }
-
-  playSound(soundName) {
-    if (this[soundName]) {
-      this[soundName].currentTime = 0;
-      this[soundName].play();
-    }
-  }
-
-  updateVolume(volume) {
-    // Update all audio volumes
-    this.bgMusic.volume = volume;
-    this.popSound.volume = volume;
-    this.altPopSound.volume = volume;
-    this.chain1.volume = volume;
-    this.chain2.volume = volume;
-    this.chain3.volume = volume;
-    this.match4.volume = volume;
-    this.match5.volume = volume;
-    this.match6.volume = volume;
-  }
-
-  // Add new method to play match size sounds
-  playMatchSound(matchSize) {
-    if (this.isMuted()) return;
-
-    let sound;
-    if (matchSize === 4) {
-      sound = this.match4;
-    } else if (matchSize === 5) {
-      sound = this.match5;
-    } else if (matchSize >= 6) {
-      sound = this.match6;
-    }
-
-    if (sound) {
-      sound.currentTime = 0;
-      sound.play().catch(console.error);
     }
   }
 }

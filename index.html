@@ -59,65 +59,112 @@
         <button class="close-modal">×</button>
         <h1 class="options-title">OPTIONS</h1>
 
-        <div class="option-group speed-section">
-          <h2>INITIAL SPEED</h2>
-          <div class="difficulty-display">
-            <div class="difficulty-level" id="speedText">NORMAL</div>
-            <div class="difficulty-number" id="speedValue">3</div>
-          </div>
-          
-          <div class="slider-container">
-            <input type="range" 
-                   id="speedSlider" 
-                   min="1" 
-                   max="50" 
-                   step="1" 
-                   value="3">
-            <div class="slider-markers">
-              <span>1</span>
-              <span>10</span>
-              <span>20</span>
-              <span>30</span>
-              <span>40</span>
-              <span>50</span>
+        <div class="options-grid">
+          <div class="options-column">
+            <div class="option-group speed-section">
+              <h2>INITIAL SPEED</h2>
+              <div class="difficulty-display">
+                <div class="difficulty-level" id="speedText">NORMAL</div>
+                <div class="difficulty-number" id="speedValue">3</div>
+              </div>
+              
+              <div class="slider-container">
+                <input type="range" 
+                       id="speedSlider" 
+                       min="1" 
+                       max="50" 
+                       step="1" 
+                       value="3">
+                <div class="slider-markers">
+                  <span>1</span>
+                  <span>10</span>
+                  <span>20</span>
+                  <span>30</span>
+                  <span>40</span>
+                  <span>50</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="option-group difficulty-section">
+              <h2>DIFFICULTY</h2>
+              <div class="difficulty-display">
+                <div class="difficulty-level" id="difficultyText">NORMAL</div>
+              </div>
+              
+              <div class="slider-container">
+                <input type="range" 
+                       id="difficultySlider" 
+                       min="0" 
+                       max="4" 
+                       step="1" 
+                       value="2">
+                <div class="slider-markers">
+                  <span>V.EASY</span>
+                  <span>EASY</span>
+                  <span>NORMAL</span>
+                  <span>HARD</span>
+                  <span>V.HARD</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="option-group difficulty-section">
-          <h2>DIFFICULTY</h2>
-          <div class="difficulty-display">
-            <div class="difficulty-level" id="difficultyText">NORMAL</div>
-          </div>
-          
-          <div class="slider-container">
-            <input type="range" 
-                   id="difficultySlider" 
-                   min="0" 
-                   max="4" 
-                   step="1" 
-                   value="2">
-            <div class="slider-markers">
-              <span>V.EASY</span>
-              <span>EASY</span>
-              <span>NORMAL</span>
-              <span>HARD</span>
-              <span>V.HARD</span>
+          <div class="options-column">
+            <div class="option-group audio-section">
+              <h2>AUDIO</h2>
+              <div class="volume-control">
+                <div class="volume-group">
+                  <label for="masterVolume">
+                    <span class="volume-label">MASTER</span>
+                    <button class="mute-btn" id="masterMuteBtn">🔊</button>
+                  </label>
+                  <input type="range" id="masterVolume" min="0" max="1" step="0.1" value="0.3">
+                </div>
+                <div class="volume-group">
+                  <label for="musicVolume">
+                    <span class="volume-label">MUSIC</span>
+                    <button class="mute-btn" id="musicMuteBtn">🔊</button>
+                  </label>
+                  <input type="range" id="musicVolume" min="0" max="1" step="0.1" value="0.8">
+                </div>
+                <div class="volume-group">
+                  <label for="sfxVolume">
+                    <span class="volume-label">SOUND FX</span>
+                    <button class="mute-btn" id="sfxMuteBtn">🔊</button>
+                  </label>
+                  <input type="range" id="sfxVolume" min="0" max="1" step="0.1" value="0.8">
+                </div>
+                <div class="checkbox-option">
+                  <label for="useAltPopSound">
+                    <input type="checkbox" id="useAltPopSound">
+                    Use 'Dick' pop sound
+                  </label>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div id="difficultyWarning" class="warning-box">
-          ⚠️ Warning: At these speeds, glitches may occur more frequently
-        </div>
-
-        <div class="option-group look-feel-section">
-          <h2>LOOK & FEEL</h2>
-          <div class="checkbox-option">
-            <label for="useAltPopSound">
-              <input type="checkbox" id="useAltPopSound">
-              Use 'Dick' pop sound
-            </label>
+            <div class="option-group look-feel-section">
+              <h2>LOOK & FEEL</h2>
+              <div class="theme-option">
+                <label for="themeSelectOptions">THEME</label>
+                <div class="theme-preview" id="themePreview">
+                    <span class="preview-block">🔥</span>
+                    <span class="preview-block">💧</span>
+                    <span class="preview-block">🍀</span>
+                    <span class="preview-block">⚡</span>
+                    <span class="preview-block">🌀</span>
+                </div>
+                <select id="themeSelectOptions">
+                  <option value="theme-elements">Elements Theme</option>
+                  <option value="theme-animals">Farm Animals</option>
+                  <option value="theme-retro">Retro Gaming</option>
+                  <option value="theme-space">Space Theme</option>
+                  <option value="theme-food">Food Theme</option>
+                  <option value="theme-weather">Weather Theme</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -156,6 +203,14 @@
     const difficultySlider = document.getElementById('difficultySlider');
     const saveButton = document.getElementById('saveOptions');
     
+    // Audio Controls
+    const masterVolumeSlider = document.getElementById('masterVolume');
+    const musicVolumeSlider = document.getElementById('musicVolume');
+    const sfxVolumeSlider = document.getElementById('sfxVolume');
+    const masterMuteBtn = document.getElementById('masterMuteBtn');
+    const musicMuteBtn = document.getElementById('musicMuteBtn');
+    const sfxMuteBtn = document.getElementById('sfxMuteBtn');
+
     // Speed settings
     const speedLabels = {
       1: 'VERY SLOW',
@@ -187,6 +242,21 @@
       'very-hard': '#CC0000'   // dark red
     };
 
+    // Function to get closest speed key for labels and colors
+    function getClosestSpeedKey(speed) {
+      return Object.keys(speedLabels)
+        .map(Number)
+        .reduce((a, b) => {
+          return Math.abs(b - speed) < Math.abs(a - speed) ? b : a;
+        });
+    }
+
+    // Function to get speed text based on current speed
+    function getSpeedText(speed) {
+      const closestKey = getClosestSpeedKey(speed);
+      return speedLabels[closestKey];
+    }
+
     // Load saved settings
     const savedVolume = localStorage.getItem('volume') || 0.3;
     const savedMuted = localStorage.getItem('muted') === 'true';
@@ -200,6 +270,15 @@
     muteBtn.textContent = savedMuted ? '🔇' : '🔊';
     speedSlider.value = savedSpeed;
     speedValue.textContent = savedSpeed;
+    
+    // Get speed text element
+    const speedText = document.getElementById('speedText');
+    
+    // Set initial speed text and color
+    if (speedText) {
+      speedText.textContent = getSpeedText(parseInt(savedSpeed));
+      speedText.style.color = speedColors[getClosestSpeedKey(parseInt(savedSpeed))];
+    }
     
     // Set initial difficulty button
     difficultySlider.value = difficulties.indexOf(savedDifficulty);
@@ -248,24 +327,32 @@
     // Speed Controls
     speedSlider.addEventListener('input', (e) => {
       const speed = parseInt(e.target.value);
-      speedValue.textContent = speed;
-      speedValue.style.color = speedColors[getClosestSpeedKey(speed)];
-      speedText.textContent = getSpeedText(speed);
-      speedText.style.color = speedColors[getClosestSpeedKey(speed)];
-      speedSlider.style.setProperty('--slider-color', speedColors[getClosestSpeedKey(speed)]);
+      const closestKey = getClosestSpeedKey(speed);
       
-      // Show warning for high speeds
-      const warningBox = document.getElementById('difficultyWarning');
-      warningBox.style.display = speed >= 30 ? 'block' : 'none';
+      // Update speed value
+      speedValue.textContent = speed;
+      speedValue.style.color = speedColors[closestKey];
+      
+      // Update speed text
+      if (speedText) {
+        speedText.textContent = speedLabels[closestKey];
+        speedText.style.color = speedColors[closestKey];
+      }
+      
+      // Update slider color
+      speedSlider.style.setProperty('--slider-color', speedColors[closestKey]);
     });
 
     // Save Button
     saveButton.addEventListener('click', () => {
       const selectedDifficulty = difficulties[parseInt(difficultySlider.value)];
       const selectedSpeed = parseInt(speedSlider.value);
+      const useAltPopSound = document.getElementById('useAltPopSound').checked;
       
       localStorage.setItem('gameSpeed', selectedSpeed);
       localStorage.setItem('gameDifficulty', selectedDifficulty);
+      localStorage.setItem('useAltPopSound', useAltPopSound);
+      audioManager.useAltPopSound = useAltPopSound;
       
       // Show save confirmation
       saveButton.textContent = 'Saved!';
@@ -409,8 +496,329 @@
             flex: 1;
             text-align: right;
         }
+
+        .theme-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .theme-option label {
+            font-family: 'Press Start 2P', cursive;
+            color: #fff;
+            font-size: 0.8rem;
+        }
+
+        .theme-preview {
+            display: flex;
+            gap: 5px;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .preview-block {
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            transition: transform 0.2s;
+        }
+
+        .preview-block:hover {
+            transform: scale(1.1);
+        }
+
+        #themeSelectOptions {
+            width: 100%;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #themeSelectOptions:hover {
+            background: rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        #themeSelectOptions option {
+            background: #1a1a1a;
+            color: #fff;
+            padding: 8px;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .options-column {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .option-group {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 8px;
+            margin: 0;
+        }
+
+        .option-group h2 {
+            margin: 0 0 20px 0;
+            text-align: center;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1rem;
+            color: #fff;
+        }
+
+        .volume-control {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .volume-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .volume-control .checkbox-option {
+            margin-top: 5px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }
+
+        @media (max-width: 768px) {
+            .options-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .options-column {
+                gap: 20px;
+            }
+
+            .option-group {
+                padding: 15px;
+            }
+        }
     `;
     document.head.appendChild(style);
+
+    // Initialize audio controls
+    masterVolumeSlider.value = audioManager.masterVolume;
+    musicVolumeSlider.value = audioManager.musicVolume;
+    sfxVolumeSlider.value = audioManager.sfxVolume;
+    masterMuteBtn.textContent = audioManager.masterVolume === 0 ? '🔇' : '🔊';
+    musicMuteBtn.textContent = audioManager.musicMuted ? '🔇' : '🔊';
+    sfxMuteBtn.textContent = audioManager.sfxMuted ? '🔇' : '🔊';
+    masterMuteBtn.classList.toggle('muted', audioManager.masterVolume === 0);
+    musicMuteBtn.classList.toggle('muted', audioManager.musicMuted);
+    sfxMuteBtn.classList.toggle('muted', audioManager.sfxMuted);
+
+    // Set initial state of useAltPopSound checkbox
+    const useAltPopSoundCheckbox = document.getElementById('useAltPopSound');
+    useAltPopSoundCheckbox.checked = audioManager.useAltPopSound;
+
+    // Add sound preview when toggling the checkbox
+    useAltPopSoundCheckbox.addEventListener('change', (e) => {
+        // Play the corresponding sound based on the new state
+        if (e.target.checked) {
+            audioManager.playSound('altPop');
+        } else {
+            audioManager.playSound('pop');
+        }
+    });
+
+    // Audio control event listeners
+    masterVolumeSlider.addEventListener('input', (e) => {
+        const volume = parseFloat(e.target.value);
+        audioManager.setMasterVolume(volume);
+        masterMuteBtn.textContent = volume === 0 ? '🔇' : '🔊';
+        masterMuteBtn.classList.toggle('muted', volume === 0);
+        
+        // Update the game's volume slider if it exists
+        const gameVolumeSlider = document.getElementById('volumeSlider');
+        if (gameVolumeSlider) {
+            gameVolumeSlider.value = volume;
+        }
+    });
+
+    musicVolumeSlider.addEventListener('input', (e) => {
+        audioManager.setMusicVolume(parseFloat(e.target.value));
+    });
+
+    sfxVolumeSlider.addEventListener('input', (e) => {
+        audioManager.setSFXVolume(parseFloat(e.target.value));
+    });
+
+    masterMuteBtn.addEventListener('click', () => {
+        const newVolume = audioManager.masterVolume === 0 ? 0.3 : 0;
+        audioManager.setMasterVolume(newVolume);
+        masterVolumeSlider.value = newVolume;
+        masterMuteBtn.textContent = newVolume === 0 ? '🔇' : '🔊';
+        masterMuteBtn.classList.toggle('muted', newVolume === 0);
+    });
+
+    musicMuteBtn.addEventListener('click', () => {
+        const isMuted = audioManager.toggleMusicMute();
+        musicMuteBtn.textContent = isMuted ? '🔇' : '🔊';
+        musicMuteBtn.classList.toggle('muted', isMuted);
+    });
+
+    sfxMuteBtn.addEventListener('click', () => {
+        const isMuted = audioManager.toggleSFXMute();
+        sfxMuteBtn.textContent = isMuted ? '🔇' : '🔊';
+        sfxMuteBtn.classList.toggle('muted', isMuted);
+    });
+
+    // Theme mappings
+    const themeSymbols = {
+        'theme-elements': ['🔥', '💧', '🍀', '⚡', '🌀'],
+        'theme-animals': ['🐮', '🐑', '🐷', '🐔', '🐴'],
+        'theme-retro': ['♥', '◆', '★', '●', '▲'],
+        'theme-space': ['🛸', '⭐', '👾', '☄️', '🪐'],
+        'theme-food': ['🍓', '🫐', '🥑', '🍌', '🍇'],
+        'theme-weather': ['🌅', '🌈', '🌱', '☀️', '⚡']
+    };
+
+    // Theme colors for each block
+    const themeColors = {
+        'theme-elements': ['#FF4D00', '#00B4D8', '#00CC6A', '#FFD700', '#6D28D9'],
+        'theme-animals': ['#D35D47', '#88B5D3', '#A4C3A2', '#ECD279', '#B784A7'],
+        'theme-retro': ['#E74858', '#209CEE', '#92CC41', '#F7D51D', '#A374C6'],
+        'theme-space': ['#FF1E39', '#00DDFF', '#00FFA3', '#FFB700', '#B026FF'],
+        'theme-food': ['#FF6B6B', '#73C2FB', '#98FF98', '#FFD700', '#E0B0FF'],
+        'theme-weather': ['#FF7E67', '#4FB4FF', '#7ED957', '#FFD93D', '#9D4EDD']
+    };
+
+    // Function to update preview blocks
+    function updateThemePreview(theme) {
+        const previewBlocks = document.querySelectorAll('#themePreview .preview-block');
+        const symbols = themeSymbols[theme];
+        const colors = themeColors[theme];
+        
+        previewBlocks.forEach((block, index) => {
+            block.textContent = symbols[index];
+            block.style.backgroundColor = colors[index];
+            block.style.boxShadow = `0 0 10px ${colors[index]}40`; // Add subtle glow
+            // Ensure emoji is visible on colored background
+            block.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
+        });
+    }
+
+    // Update the CSS for preview blocks
+    const previewStyles = document.createElement('style');
+    previewStyles.textContent = `
+        .preview-block {
+            font-size: 24px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .preview-block:hover {
+            transform: scale(1.1);
+            filter: brightness(1.2);
+        }
+
+        .theme-preview {
+            display: flex;
+            gap: 5px;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+    `;
+    document.head.appendChild(previewStyles);
+
+    // Load saved theme and update preview
+    const savedTheme = localStorage.getItem('selectedTheme') || 'theme-elements';
+    themeSelectOptions.value = savedTheme;
+    updateThemePreview(savedTheme);
+
+    // Update preview when theme changes
+    themeSelectOptions.addEventListener('change', (e) => {
+        const newTheme = e.target.value;
+        updateThemePreview(newTheme);
+        
+        // Update the theme select in the game's info box if it exists
+        const gameThemeSelect = document.getElementById('themeSelect');
+        if (gameThemeSelect) {
+            gameThemeSelect.value = newTheme;
+            // Trigger the change event on the game's theme select
+            gameThemeSelect.dispatchEvent(new Event('change'));
+        } else {
+            // If we're not in the game, just update theme directly
+            audioManager.updateThemeMusic(newTheme);
+            localStorage.setItem('selectedTheme', newTheme);
+            document.body.className = newTheme;
+        }
+    });
+
+    themeSelect.addEventListener('change', (e) => {
+        const newTheme = e.target.value;
+        themeSelectOptions.value = newTheme;
+        updateThemePreview(newTheme);
+        audioManager.updateThemeMusic(newTheme);
+        localStorage.setItem('selectedTheme', newTheme);
+        document.body.className = newTheme;
+    });
+
+    // Update the CSS for the checkbox in the audio section
+    const audioStyles = document.createElement('style');
+    audioStyles.textContent = `
+        .volume-control .checkbox-option {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }
+
+        .volume-control .checkbox-option label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.7rem;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .volume-control .checkbox-option input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+    `;
+    document.head.appendChild(audioStyles);
   </script>
 </body>
 </html> 

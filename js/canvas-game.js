@@ -21,8 +21,8 @@ class CanvasGame {
         this.particles = [];
         
         // Base dimensions (logical size)
-        this.baseWidth = (GRID_X * (BLOCK_SIZE + GAP)) + (GRID_PADDING * 2);
-        this.baseHeight = (GRID_Y * (BLOCK_SIZE + GAP)) + (GRID_PADDING * 2);
+        this.baseWidth = (GRID_X * BLOCK_SIZE) + ((GRID_X - 1) * GAP) + (GRID_PADDING * 2);
+        this.baseHeight = (GRID_Y * BLOCK_SIZE) + ((GRID_Y - 1) * GAP) + (GRID_PADDING * 2);
         
         // Get saved settings
         const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
@@ -289,6 +289,19 @@ class CanvasGame {
         document.getElementById('tryAgainBtn').addEventListener('click', () => {
             this.resetGame();
         });
+
+        // Add info box toggle functionality
+        const infoBox = document.querySelector('.info-box');
+        const toggleButton = document.querySelector('.info-box-toggle');
+        if (toggleButton && infoBox) {
+            toggleButton.addEventListener('click', () => {
+                infoBox.classList.toggle('hidden');
+                // Update button text based on info box state
+                toggleButton.textContent = infoBox.classList.contains('hidden') ? '?' : '×';
+            });
+            // Set initial text based on initial state
+            toggleButton.textContent = infoBox.classList.contains('hidden') ? '?' : '×';
+        }
     }
     
     drawBlock(x, y, block) {
@@ -616,27 +629,22 @@ class CanvasGame {
             
             this.ctx.save();
             this.ctx.textAlign = 'center';
-            this.ctx.textBaseline = 'bottom';
-            this.ctx.fillStyle = `rgba(255,255,255,${opacity})`;
+            this.textBaseline = 'middle';
             
             if (score.multiplier > 1) {
-                // Draw chain multiplier
-                this.ctx.font = 'bold 24px "Press Start 2P"';
-                this.ctx.fillStyle = `rgba(255,220,0,${opacity})`;
-                this.ctx.fillText(`×${score.multiplier}`, score.x, y - 20);
-                
-                // Draw base score
-                this.ctx.font = '20px "Press Start 2P"';
-                this.ctx.fillStyle = `rgba(255,255,255,${opacity})`;
-                this.ctx.fillText(`${score.baseScore}`, score.x, y);
-                
-                // Draw total score
-                this.ctx.font = 'bold 28px "Press Start 2P"';
+                // Draw total score first (centered)
+                this.ctx.font = 'bold 32px "Press Start 2P"';
                 this.ctx.fillStyle = `rgba(255,180,0,${opacity})`;
-                this.ctx.fillText(`${score.totalScore}`, score.x, y + 30);
+                this.ctx.fillText(`${score.totalScore}`, score.x, y);
+                
+                // Draw chain multiplier to the right and slightly up
+                this.ctx.font = 'bold 28px "Press Start 2P"';
+                this.ctx.fillStyle = `rgba(255,220,0,${opacity})`;
+                this.ctx.fillText(`×${score.multiplier}`, score.x + 80, y - 10);
             } else {
                 // Just draw the score for non-chain matches
                 this.ctx.font = 'bold 24px "Press Start 2P"';
+                this.ctx.fillStyle = `rgba(255,255,255,${opacity})`;
                 this.ctx.fillText(`${score.baseScore}`, score.x, y);
             }
             
@@ -1274,17 +1282,33 @@ class CanvasGame {
     }
 
     checkDangerState() {
+        // Base warning duration in milliseconds (2000ms = 2 seconds)
+        const baseWarningDuration = 2000;
+        
+        // Difficulty-based duration multipliers
+        const durationMultipliers = {
+            'very-easy': 2.0,    // 4 seconds
+            'easy': 1.5,         // 3 seconds
+            'normal': 1.0,       // 2 seconds
+            'hard': 0.75,        // 1.5 seconds
+            'very-hard': 0.5     // 1 second
+        };
+
         // Check top row for blocks
         const hasBlocksAtTop = this.grid[0].some(block => block !== null);
         
         if (hasBlocksAtTop && !this.dangerState.active) {
+            // Store the current rising speed before stopping
+            const currentSpeed = this.risingState.speed;
+            
             // Stop rising and enter final danger state
             this.risingState.speed = 0;
             this.dangerState = {
                 active: true,
                 startTime: performance.now(),
-                warningDuration: 2000, // 2 seconds to clear the top
-                isFinalWarning: true
+                warningDuration: baseWarningDuration * durationMultipliers[this.speedState.difficulty],
+                isFinalWarning: true,
+                previousSpeed: currentSpeed // Store the speed to resume at
             };
         } else if (hasBlocksAtTop && this.dangerState.active && this.dangerState.isFinalWarning) {
             // Check if time's up during final warning
@@ -1296,7 +1320,8 @@ class CanvasGame {
         } else if (!hasBlocksAtTop && this.dangerState.active && this.dangerState.isFinalWarning) {
             // Player cleared the top row in time
             this.dangerState.active = false;
-            this.risingState.speed = 0.1; // Resume normal rising speed
+            // Resume at the previous speed instead of fixed value
+            this.risingState.speed = this.dangerState.previousSpeed;
         }
     }
 
