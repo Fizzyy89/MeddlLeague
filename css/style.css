@@ -698,12 +698,12 @@ h1 {
 .menu-item.disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  border-color: rgba(255,255,255,0.2);
+  pointer-events: none;
+  position: relative;
 }
 
 .menu-item.disabled:hover {
   transform: none;
-  background: rgba(255, 255, 255, 0.1);
   box-shadow: none;
 }
 

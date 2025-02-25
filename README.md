@@ -1,6 +1,6 @@
-# Landratsamt Puzzle League (Canvas Edition)
+# Dr. Rohrs Meddlleague
 
-A modern, canvas-based implementation of a classic match-3 puzzle game, featuring smooth animations, dynamic difficulty scaling, and multiple visual themes.
+A modern puzzle game inspired by Panel de Pon / Tetris Attack / Pokemon Puzzle League.
 
 ## Core Features
 
