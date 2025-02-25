@@ -18,6 +18,9 @@
             height: 100vh;
             z-index: -1;
             pointer-events: none;
+            filter: blur(1px);
+            opacity: 0.8;
+            transform: scale(1.1); /* Prevents blur edges from showing */
         }
         .canvas-container {
             position: relative;
@@ -46,7 +49,7 @@
     <div class="info-box">
         <button class="info-box-toggle">→</button>
         <div class="game-mode-container">
-            <h1>SOLO MODE</h1>
+            <h1>SOLO PLAY</h1>
             <div class="difficulty-indicator">
                 DIFFICULTY: <span id="currentDifficulty">NORMAL</span><br>
                 SPEED: <span id="currentSpeed">3</span><br>
@@ -62,7 +65,7 @@
             <li>KEYBOARD: Move with arrow keys, swap with space. Shift to rise.</li>
             <li>MOUSE: Move cursor, click to swap. Right click to rise.</li>
             <li>Match 3+ same blocks to clear them</li>
-            <li>New blocks rise from the bottom!</li>
+            <li>New blocks rise from the bottom, getting faster as the game goes on.</li>
             <li>If you run out of space, GAME OVER!</li>
         </ul>
         <div class="theme-select">
@@ -93,7 +96,7 @@
 
     <!-- Game Over Modal -->
     <div id="gameOverModal" class="game-over-modal" style="display: none;">
-        <h2>GAME OVER!</h2>
+        <h2>MEDDL OFF!</h2>
         <p>DIFFICULTY: <span id="finalDifficulty">NORMAL</span></p>
         <p>Final Score: <span id="finalScore">0</span></p>
         <p>High Score: <span id="finalHighScore">0</span></p>

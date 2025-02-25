@@ -31,14 +31,3 @@ export const RISE_TIMINGS = {
 export function getRiseTime(difficulty) {
   return RISE_TIMINGS[difficulty] || RISE_TIMINGS[1];
 }
-
-// Simplified AI settings
-export const AI_SETTINGS = {
-  "1": {
-    moveDelay: 1500,
-    thinkTime: 600,
-    missChance: 0.6,
-    randomChance: 0.5,
-    setupChance: 0.2
-  }
-}; 

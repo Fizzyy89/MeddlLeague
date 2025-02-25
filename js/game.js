@@ -934,11 +934,22 @@ class CanvasGame {
                 attempts++;
                 if (attempts > 10) break;
             } while (
+                // Check horizontal matches within preview row
                 (x >= 2 && color === this.risingState.previewRow[x-1] && 
-                 color === this.risingState.previewRow[x-2])
+                 color === this.risingState.previewRow[x-2]) ||
+                // Check vertical matches with existing grid
+                (this.grid[GRID_Y-1] && this.grid[GRID_Y-2] && 
+                 color === this.getBlockType(this.grid[GRID_Y-1][x]) &&
+                 color === this.getBlockType(this.grid[GRID_Y-2][x]))
             );
             this.risingState.previewRow[x] = color;
         }
+    }
+    
+    // Helper method to safely get block type regardless of block format
+    getBlockType(block) {
+        if (!block) return null;
+        return typeof block === 'object' ? block.type : block;
     }
     
     updateRising(currentTime) {
