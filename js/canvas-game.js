@@ -170,8 +170,15 @@ class CanvasGame {
         this.updateSpeedDisplay();
         this.updateTimer(performance.now());
         
-        // Start background music
-        audioManager.bgMusic.play().catch(console.error);
+        // Try to start background music immediately, with click fallback
+        audioManager.bgMusic.play().catch(() => {
+            // If autoplay fails, set up click listener as fallback
+            document.addEventListener('click', () => {
+                if (audioManager.bgMusic.paused) {
+                    audioManager.bgMusic.play().catch(console.error);
+                }
+            }, { once: true });
+        });
         
         // Start game loop
         this.rafId = requestAnimationFrame(() => this.gameLoop());
@@ -422,14 +429,51 @@ class CanvasGame {
             this.ctx.translate(-centerX, -centerY);
         } else if (blockState === 'popping') {
             const progress = (currentTime - block.animationStart) / 300;
-            const scale = 1 - progress;
-            const alpha = 1 - progress;
             
-            // Scale block from center while fading out
+            // Enhanced popping animation
+            this.ctx.save();
+            
+            // Create a more interesting scale effect
+            const scaleBase = 1 - progress;
+            const scaleX = scaleBase * (1 + Math.sin(progress * Math.PI * 3) * 0.3);
+            const scaleY = scaleBase * (1 + Math.cos(progress * Math.PI * 2) * 0.3);
+            
+            // Add a slight rotation for more dynamic feel
+            const rotation = progress * Math.PI * 0.5; // quarter turn
+            
+            // Add vibrant glow effect that intensifies during pop
+            const glowIntensity = Math.sin(progress * Math.PI) * 15;
+            this.ctx.shadowColor = this.getBlockColor(blockType);
+            this.ctx.shadowBlur = glowIntensity;
+            
+            // Fade out with a non-linear curve for more visual interest
+            const alpha = Math.cos(progress * Math.PI/2);
+            
+            // Apply transformations
             this.ctx.translate(centerX, centerY);
-            this.ctx.scale(scale, scale);
+            this.ctx.rotate(rotation);
+            this.ctx.scale(scaleX, scaleY);
             this.ctx.translate(-centerX, -centerY);
             this.ctx.globalAlpha = alpha;
+            
+            // Draw sparkle effect around the popping block
+            if (progress < 0.7) {
+                const sparkleCount = 6;
+                const sparkleRadius = BLOCK_SIZE * 0.7 * (0.3 + progress);
+                const sparkleOpacity = (1 - progress) * 0.8;
+                
+                for (let i = 0; i < sparkleCount; i++) {
+                    const angle = (i / sparkleCount) * Math.PI * 2 + progress * Math.PI;
+                    const sparkleX = centerX + Math.cos(angle) * sparkleRadius;
+                    const sparkleY = centerY + Math.sin(angle) * sparkleRadius;
+                    const sparkleSize = 4 * (1 - progress);
+                    
+                    this.ctx.beginPath();
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${sparkleOpacity})`;
+                    this.ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+            }
         }
         
         this.ctx.beginPath();
@@ -463,6 +507,25 @@ class CanvasGame {
                 this.ctx.shadowBlur = 8;
                 this.ctx.fillStyle = 'white';
                 this.ctx.fillText(symbol, centerX, centerY + floatY);
+            } else if (blockState === 'popping') {
+                const progress = (currentTime - block.animationStart) / 300;
+                
+                // Enhanced symbol animation for popping
+                const symbolScale = 1.2 - progress * 0.5;
+                const symbolOpacity = 1 - progress * 1.5; // Fade out faster than block
+                
+                if (symbolOpacity > 0) {
+                    // Add vibrant glow to the symbol
+                    this.ctx.shadowColor = 'white';
+                    this.ctx.shadowBlur = 12 * (1 - progress);
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${symbolOpacity})`;
+                    
+                    // Scale and drift the symbol upward slightly
+                    const driftY = -progress * 10;
+                    
+                    this.ctx.font = `${30 * symbolScale}px Arial`;
+                    this.ctx.fillText(symbol, centerX, centerY + driftY);
+                }
             } else {
                 // Normal emoji rendering
                 this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
@@ -482,6 +545,7 @@ class CanvasGame {
 
         // Reset transformations
         if (blockState === 'popping') {
+            this.ctx.restore();
             this.ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
         }
 
@@ -1219,29 +1283,35 @@ class CanvasGame {
         const muteBtn = document.getElementById('muteBtn');
         
         // Set initial values from AudioManager
-        volumeSlider.value = audioManager.bgMusic.volume;
-        muteBtn.textContent = audioManager.bgMusic.muted ? '🔇' : '🔊';
+        volumeSlider.value = audioManager.masterVolume;
+        muteBtn.textContent = audioManager.masterVolume === 0 ? '🔇' : '🔊';
         
-        // Set up volume control
+        // Set up volume control using AudioManager's methods
         volumeSlider.addEventListener('input', (e) => {
-            const newVolume = e.target.value;
-            audioManager.bgMusic.volume = newVolume;
-            localStorage.setItem('volume', newVolume);
-            muteBtn.textContent = newVolume === '0' ? '🔇' : '🔊';
+            const newVolume = parseFloat(e.target.value);
+            audioManager.setMasterVolume(newVolume);
+            // No need to set localStorage here as the AudioManager will handle it
+            muteBtn.textContent = newVolume === 0 ? '🔇' : '🔊';
         });
         
-        // Set up mute toggle using AudioManager
+        // Set up mute toggle using AudioManager's masterVolume
         muteBtn.addEventListener('click', () => {
-            audioManager.bgMusic.muted = !audioManager.bgMusic.muted;
-            localStorage.setItem('muted', audioManager.bgMusic.muted);
-            muteBtn.textContent = audioManager.bgMusic.muted ? '🔇' : '🔊';
-            
-            // Ensure volume slider reflects muted state
-            if (audioManager.bgMusic.muted) {
-                volumeSlider.value = 0;
-            } else {
-                volumeSlider.value = localStorage.getItem('volume') || 0.3;
-            }
+            const newVolume = audioManager.masterVolume === 0 ? 0.3 : 0;
+            audioManager.setMasterVolume(newVolume);
+            localStorage.setItem('masterVolume', newVolume);
+            muteBtn.textContent = newVolume === 0 ? '🔇' : '🔊';
+            volumeSlider.value = newVolume;
+        });
+        
+        // Try to play background music immediately
+        audioManager.bgMusic.play().catch(() => {
+            // If autoplay is blocked, add a click listener to start music
+            document.addEventListener('click', function initMusic() {
+                if (audioManager.bgMusic.paused) {
+                    audioManager.bgMusic.play().catch(console.error);
+                }
+                document.removeEventListener('click', initMusic);
+            }, { once: true });
         });
     }
 
