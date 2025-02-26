@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dr. Rohrs Meddlleague - Versus Mode</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/themes.css">
+    <link rel="stylesheet" href="css/animations.css">
+    <link rel="stylesheet" href="css/versus.css">
+    <style>
+        /* Canvas-specific styles */
+        #bgCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            pointer-events: none;
+            filter: blur(1px);
+            opacity: 0.8;
+            transform: scale(1.1); /* Prevents blur edges from showing */
+        }
+        .versus-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 40px;
+            margin-top: 50px;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 1200px;
+            width: 100%;
+        }
+        .canvas-container {
+            position: relative;
+            padding: 15px;
+            border: 2px solid #4a4a4a;
+            border-radius: 15px;
+            display: inline-block;
+            width: fit-content;
+            box-sizing: border-box;
+            transition: box-shadow 0.3s ease;
+            background: rgba(0,0,0,0.2);
+        }
+        .canvas-container.player {
+            border-color: #4a90e2;
+            box-shadow: 0 0 30px rgba(74, 144, 226, 0.2);
+        }
+        .canvas-container.ai {
+            border-color: #e24a4a;
+            box-shadow: 0 0 30px rgba(226, 74, 74, 0.2);
+        }
+        .game-canvas {
+            position: relative;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.3);
+            display: block;
+            image-rendering: crisp-edges;
+        }
+        .board-label {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.2em;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        .player-label {
+            color: #4a90e2;
+            text-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+        }
+        .ai-label {
+            color: #e24a4a;
+            text-shadow: 0 0 10px rgba(226, 74, 74, 0.5);
+        }
+        .versus-text {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 2em;
+            color: #ffd93d;
+            text-shadow: 0 0 15px rgba(255, 217, 61, 0.7);
+            z-index: 1;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 20px;
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        /* Only switch to column layout on smaller screens */
+        @media (max-width: 960px) {
+            .versus-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .versus-text {
+                margin: 20px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-button">← Menu</a>
+    <canvas id="bgCanvas"></canvas>
+    
+    <div class="versus-container">
+        <div class="canvas-container player">
+            <div class="board-label player-label">YOU</div>
+            <canvas id="playerCanvas" class="game-canvas"></canvas>
+        </div>
+        
+        <div class="versus-text">VS</div>
+        
+        <div class="canvas-container ai">
+            <div class="board-label ai-label">AI</div>
+            <canvas id="aiCanvas" class="game-canvas"></canvas>
+        </div>
+    </div>
+    
+    <div class="info-box">
+        <button class="info-box-toggle">→</button>
+        <div class="game-mode-container">
+            <h1>VERSUS MODE</h1>
+            <div class="difficulty-indicator">
+                DIFFICULTY: <span id="currentDifficulty">NORMAL</span><br>
+                SPEED: <span id="currentSpeed">3</span><br>
+                TIME: <span id="gameTimer">00:00</span>
+            </div>
+        </div>
+        <div class="score-display">
+            <div>YOUR SCORE: <span id="playerScoreValue">0</span></div>
+            <div>AI SCORE: <span id="aiScoreValue">0</span></div>
+        </div>
+        <h2>HOW TO PLAY</h2>
+        <ul>
+            <li>KEYBOARD: Move with arrow keys, swap with space. Shift to rise.</li>
+            <li>MOUSE: Move cursor, click to swap. Right click to rise.</li>
+            <li>Match 3+ same blocks to clear them</li>
+            <li>You win if the AI's blocks reach the top first!</li>
+            <li>You lose if your blocks reach the top first!</li>
+        </ul>
+        <div class="theme-select">
+            <select id="themeSelect">
+                <option value="theme-elements">Elements Theme</option>
+                <option value="theme-animals">Farm Animals</option>
+                <option value="theme-retro">Retro Gaming</option>
+                <option value="theme-space">Space Theme</option>
+                <option value="theme-food">Food Theme</option>
+                <option value="theme-weather">Weather Theme</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="volumeControl">
+        <button id="muteBtn">🔊</button>
+        <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3">
+    </div>
+
+    <audio id="bgMusic" loop>
+        <source src="music/theme.mp3" type="audio/mpeg">
+        <script>
+            document.getElementById('bgMusic').addEventListener('error', (e) => {
+                console.error('Audio error:', e);
+            });
+        </script>
+    </audio>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="game-over-modal" style="display: none;">
+        <h2 id="gameOverTitle">GAME OVER</h2>
+        <p id="gameOverMessage"></p>
+        <p>DIFFICULTY: <span id="finalDifficulty">NORMAL</span></p>
+        <p>Your Score: <span id="finalPlayerScore">0</span></p>
+        <p>AI Score: <span id="finalAiScore">0</span></p>
+        <button id="tryAgainBtn">Try Again</button>
+    </div>
+
+    <script type="module" src="js/versus.js"></script>
+</body>
+</html> 
