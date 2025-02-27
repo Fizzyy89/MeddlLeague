@@ -26,7 +26,7 @@ class CanvasGame {
         
         // Get saved settings
         const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
-        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'normal';
+        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'easy';
         
         // Game state initialization
         this.grid = [];
@@ -185,20 +185,22 @@ class CanvasGame {
     }
     
     resize() {
-        // Get container dimensions
-        const container = this.canvas.parentElement;
-        const containerWidth = container.clientWidth;
+        // Calculate available width (accounting for margins and padding)
+        const totalAvailableWidth = window.innerWidth - 80; // Subtract margins
+        
+        // Limit max width while allowing it to grow with screen size
+        const maxWidth = Math.min(560, totalAvailableWidth);
         
         // Calculate available height (accounting for UI elements)
         const availableHeight = window.innerHeight - 200; // -200 for margins/UI
         
-        // Calculate maximum scale that fits in container
-        const maxScaleX = (containerWidth - 30) / this.baseWidth;  // -30 for padding
+        // Calculate maximum scale that fits in available space
+        const maxScaleX = maxWidth / this.baseWidth;
         const maxScaleY = availableHeight / this.baseHeight;
         
         // Set minimum and maximum scales
-        const minScale = 1;    // Never smaller than original size
-        const maxScale = 2.5;  // Allow up to 2.5x scaling
+        const minScale = 0.6;    // Allow scaling down for small screens
+        const maxScale = 1.8;    // Limit maximum scaling
         
         // Calculate optimal scale
         this.scale = Math.min(maxScaleX, maxScaleY, maxScale);
@@ -208,13 +210,16 @@ class CanvasGame {
         this.canvas.width = this.baseWidth * this.scale;
         this.canvas.height = this.baseHeight * this.scale;
         
+        // Apply the same scaling to the background canvas
+        this.bgCanvas.width = window.innerWidth;
+        this.bgCanvas.height = window.innerHeight;
+        
         // Enable smooth scaling
         this.ctx.imageSmoothingEnabled = true;
-        
-        // Also resize background canvas
-        this.bgCanvas.width = this.baseWidth * this.scale;
-        this.bgCanvas.height = this.baseHeight * this.scale;
         this.bgCtx.imageSmoothingEnabled = true;
+        
+        // Set transforms for both contexts
+        this.ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
     }
     
     initGrid() {
@@ -350,6 +355,9 @@ class CanvasGame {
             // Set initial text based on initial state
             toggleButton.textContent = infoBox.classList.contains('hidden') ? '?' : '×';
         }
+        
+        // Window resize handler
+        window.addEventListener('resize', () => this.resize());
     }
     
     drawBlock(x, y, block) {
@@ -390,7 +398,7 @@ class CanvasGame {
         
         // Add danger animation for ALL blocks when in final warning
         if (this.dangerState.active && this.dangerState.isFinalWarning) {
-            const dangerProgress = (currentTime - this.dangerState.startTime) / 300; // 300ms per pulse
+            const dangerProgress = (currentTime - this.dangerState.startTime) / 300;
             const dangerPulse = Math.sin(dangerProgress * Math.PI * 2) * 0.3 + 0.7;
             
             this.ctx.save();
@@ -1180,10 +1188,13 @@ class CanvasGame {
         // Update timer
         this.updateTimer(currentTime);
         
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.save();
-        this.ctx.scale(this.scale, this.scale);
+        // Clear the canvas
+        this.ctx.clearRect(0, 0, this.baseWidth, this.baseHeight);
         
+        // Save the current transform state and reset
+        this.ctx.save();
+        
+        // Draw background
         this.ctx.fillStyle = 'rgba(0,0,0,0.3)';
         this.ctx.fillRect(0, 0, this.baseWidth, this.baseHeight);
         
@@ -1199,6 +1210,7 @@ class CanvasGame {
         this.drawChainIndicator(currentTime);
         this.drawCursor();
         
+        // Restore the original transform state
         this.ctx.restore();
         
         this.lastFrameTime = currentTime;
@@ -1483,7 +1495,7 @@ class CanvasGame {
         
         // Get current saved speed setting
         const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
-        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'normal';
+        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'easy';
         
         // Update speed state with saved values
         this.speedState = {

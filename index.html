@@ -6,7 +6,6 @@
   <title>Dr. Rohrs Meddlleague</title>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/themes.css">
   <link rel="stylesheet" href="css/animations.css">
 </head>
 <body>
@@ -267,6 +266,23 @@
       'very-hard': '#CC0000'   // dark red
     };
 
+    // AI difficulty settings
+    const aiDifficultyLabels = {
+      1: 'VERY EASY',
+      2: 'EASY',
+      3: 'NORMAL',
+      4: 'HARD', 
+      5: 'VERY HARD'
+    };
+    
+    const aiDifficultyColors = {
+      1: '#90EE90',  // light green
+      2: '#32CD32',  // green
+      3: '#FFD700',  // yellow
+      4: '#FF4444',  // red
+      5: '#CC0000'   // dark red
+    };
+
     // Function to get closest speed key for labels and colors
     function getClosestSpeedKey(speed) {
       return Object.keys(speedLabels)
@@ -286,7 +302,8 @@
     const savedVolume = localStorage.getItem('volume') || 0.3;
     const savedMuted = localStorage.getItem('muted') === 'true';
     const savedSpeed = localStorage.getItem('gameSpeed') || '3';
-    const savedDifficulty = localStorage.getItem('gameDifficulty') || 'normal';
+    const savedDifficulty = localStorage.getItem('gameDifficulty') || 'easy';
+    const savedAiDifficulty = localStorage.getItem('aiDifficulty') || '2';
     
     // Initial setup
     bgMusic.volume = savedVolume;
@@ -313,6 +330,32 @@
     difficultyText.textContent = savedDifficulty.toUpperCase().replace('-', ' ');
     difficultyText.style.color = difficultyColors[savedDifficulty];
     difficultySlider.style.setProperty('--slider-color', difficultyColors[savedDifficulty]);
+    
+    // Get AI difficulty elements
+    const aiDifficultySlider = document.getElementById('aiDifficultySlider');
+    const aiDifficultyText = document.getElementById('aiDifficultyText');
+    
+    // Initialize AI difficulty from localStorage
+    if (aiDifficultySlider && aiDifficultyText) {
+      const aiLevel = parseInt(savedAiDifficulty);
+      
+      // Set initial values
+      aiDifficultySlider.value = aiLevel;
+      aiDifficultyText.textContent = aiDifficultyLabels[aiLevel];
+      aiDifficultyText.style.color = aiDifficultyColors[aiLevel];
+      aiDifficultySlider.style.setProperty('--slider-color', aiDifficultyColors[aiLevel]);
+      
+      // Add input event listener
+      aiDifficultySlider.addEventListener('input', (e) => {
+        const level = parseInt(e.target.value);
+        const color = aiDifficultyColors[level];
+        
+        // Update difficulty text and color
+        aiDifficultyText.textContent = aiDifficultyLabels[level];
+        aiDifficultyText.style.color = color;
+        aiDifficultySlider.style.setProperty('--slider-color', color);
+      });
+    }
 
     // Close button functionality
     closeModalBtns.forEach(btn => {
@@ -367,7 +410,7 @@
       // Update slider color
       speedSlider.style.setProperty('--slider-color', speedColors[closestKey]);
     });
-
+    
     // Save Button
     saveButton.addEventListener('click', () => {
       const selectedDifficulty = difficulties[parseInt(difficultySlider.value)];
@@ -810,15 +853,6 @@
         }
     });
 
-    themeSelect.addEventListener('change', (e) => {
-        const newTheme = e.target.value;
-        themeSelectOptions.value = newTheme;
-        updateThemePreview(newTheme);
-        audioManager.updateThemeMusic(newTheme);
-        localStorage.setItem('selectedTheme', newTheme);
-        document.body.className = newTheme;
-    });
-
     // Update the CSS for the checkbox in the audio section
     const audioStyles = document.createElement('style');
     audioStyles.textContent = `
@@ -846,47 +880,6 @@
         }
     `;
     document.head.appendChild(audioStyles);
-
-    // AI Difficulty Controls
-    const aiDifficultySlider = document.getElementById('aiDifficultySlider');
-    const aiDifficultyText = document.getElementById('aiDifficultyText');
-    
-    // AI difficulty settings
-    const aiDifficultyLabels = {
-      1: 'VERY EASY',
-      2: 'EASY',
-      3: 'NORMAL',
-      4: 'HARD',
-      5: 'VERY HARD'
-    };
-    
-    const aiDifficultyColors = {
-      1: '#90EE90',  // light green
-      2: '#32CD32',  // green
-      3: '#FFD700',  // yellow
-      4: '#FF4444',  // red
-      5: '#CC0000'   // dark red
-    };
-    
-    // Load saved AI difficulty
-    const savedAiDifficulty = localStorage.getItem('aiDifficulty') || '3';
-    aiDifficultySlider.value = savedAiDifficulty;
-    
-    // Set initial AI difficulty text and color
-    aiDifficultyText.textContent = aiDifficultyLabels[parseInt(savedAiDifficulty)];
-    aiDifficultyText.style.color = aiDifficultyColors[parseInt(savedAiDifficulty)];
-    aiDifficultySlider.style.setProperty('--slider-color', aiDifficultyColors[parseInt(savedAiDifficulty)]);
-    
-    // Update AI difficulty on slider change
-    aiDifficultySlider.addEventListener('input', (e) => {
-      const level = parseInt(e.target.value);
-      const color = aiDifficultyColors[level];
-      
-      // Update difficulty text and color
-      aiDifficultyText.textContent = aiDifficultyLabels[level];
-      aiDifficultyText.style.color = color;
-      aiDifficultySlider.style.setProperty('--slider-color', color);
-    });
   </script>
 </body>
 </html> 

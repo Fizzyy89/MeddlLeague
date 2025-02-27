@@ -4,17 +4,60 @@ import { AIPlayer } from './ai-player.js';
 
 class VersusGame {
     constructor() {
-        // Canvas setup for player
-        this.playerCanvas = document.getElementById('playerCanvas');
-        this.playerCtx = this.playerCanvas.getContext('2d');
+        console.log("Initializing Versus game");
         
-        // Canvas setup for AI
+        // Game canvas elements
+        this.bgCanvas = document.getElementById('bgCanvas');
+        this.playerCanvas = document.getElementById('playerCanvas');
         this.aiCanvas = document.getElementById('aiCanvas');
+        
+        // Get contexts
+        this.bgCtx = this.bgCanvas.getContext('2d');
+        this.playerCtx = this.playerCanvas.getContext('2d');
         this.aiCtx = this.aiCanvas.getContext('2d');
         
-        // Background canvas setup
-        this.bgCanvas = document.getElementById('bgCanvas');
-        this.bgCtx = this.bgCanvas.getContext('2d');
+        // Enable crisp pixel rendering
+        this.playerCtx.imageSmoothingEnabled = false;
+        this.aiCtx.imageSmoothingEnabled = false;
+        
+        // Score display
+        this.playerScoreDisplay = document.getElementById('playerScoreValue');
+        this.aiScoreDisplay = document.getElementById('aiScoreValue');
+        
+        // Speed display
+        this.speedDisplay = document.getElementById('currentSpeed');
+        
+        // Difficulty display
+        this.difficultyDisplay = document.getElementById('currentDifficulty');
+        
+        // AI Difficulty display
+        this.aiDifficultyDisplay = document.getElementById('currentAiDifficulty');
+        
+        // Timer display
+        this.timerDisplay = document.getElementById('gameTimer');
+        
+        // Game over elements
+        this.gameOverModal = document.getElementById('gameOverModal');
+        this.gameOverTitle = document.getElementById('gameOverTitle');
+        this.gameOverMessage = document.getElementById('gameOverMessage');
+        this.finalPlayerScoreDisplay = document.getElementById('finalPlayerScore');
+        this.finalAiScoreDisplay = document.getElementById('finalAiScore');
+        this.finalDifficultyDisplay = document.getElementById('finalDifficulty');
+        
+        // Try again button
+        this.tryAgainBtn = document.getElementById('tryAgainBtn');
+        
+        // Audio manager
+        this.bgMusic = document.getElementById('bgMusic');
+        this.initAudio();
+        
+        // Initialize theme properties (will be set properly in updateTheme)
+        this.blockSymbols = {}; // For backward compatibility
+        this.blockColors = {};  // For backward compatibility
+        this.playerBlockSymbols = {};
+        this.playerBlockColors = {};
+        this.aiBlockSymbols = {};
+        this.aiBlockColors = {};
         
         // Add timing and interpolation properties
         this.frameCount = 0;
@@ -32,7 +75,8 @@ class VersusGame {
         
         // Get saved settings
         const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
-        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'normal';
+        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'easy';
+        const savedAiDifficulty = parseInt(localStorage.getItem('aiDifficulty')) || 2;
         
         // Initialize scale and resize
         this.playerScale = 1;
@@ -42,8 +86,8 @@ class VersusGame {
         // Game state initialization for player
         this.playerState = {
             grid: [],
-            cursorX: 0,
-            cursorY: 0,
+            cursorX: 3,
+            cursorY: 5,
             score: 0,
             isSwapping: false,
             gameOver: false,
@@ -88,8 +132,8 @@ class VersusGame {
         // Game state initialization for AI
         this.aiState = {
             grid: [],
-            cursorX: 0,
-            cursorY: 0,
+            cursorX: 3,
+            cursorY: 5,
             score: 0,
             isSwapping: false,
             gameOver: false,
@@ -152,8 +196,9 @@ class VersusGame {
         this.initGrids();               // First create the grids
         this.generatePreviewRows();     // Then generate preview rows
         
-        // Initialize AI player
+        // Initialize AI player with specified difficulty
         this.ai = new AIPlayer(this.aiState);
+        this.ai.setDifficulty(savedAiDifficulty);
         
         // Timer state
         this.timerState = {
@@ -199,9 +244,6 @@ class VersusGame {
         
         // Setup event listeners
         this.setupEventListeners();
-        
-        // Initialize audio
-        this.initAudio();
         
         // Try to start background music immediately, with click fallback
         audioManager.bgMusic.play().catch(() => {
@@ -884,14 +926,17 @@ class VersusGame {
             ctx.globalAlpha *= dangerPulse;
         }
         
-        // Draw block background with animation effects
-        ctx.fillStyle = this.getBlockColor(blockType);
+        // Determine whether to use player or AI theme based on the gameState
+        const isAiBlock = gameState === this.aiState;
+        
+        // Choose the appropriate color based on whether it's an AI block or player block
+        ctx.fillStyle = this.getBlockColor(blockType, isAiBlock);
         
         if (blockState === 'matching') {
             const progress = (currentTime - block.animationStart) / 300;
             
             // Gentle glow effect
-            ctx.shadowColor = this.getBlockColor(blockType);
+            ctx.shadowColor = this.getBlockColor(blockType, isAiBlock);
             ctx.shadowBlur = 10;
             
             // Subtle pulse that doesn't go too transparent
@@ -916,7 +961,7 @@ class VersusGame {
             
             // Add vibrant glow effect that intensifies during pop
             const glowIntensity = Math.sin(progress * Math.PI) * 15;
-            ctx.shadowColor = this.getBlockColor(blockType);
+            ctx.shadowColor = this.getBlockColor(blockType, isAiBlock);
             ctx.shadowBlur = glowIntensity;
             
             // Fade out with a non-linear curve for more visual interest
@@ -953,8 +998,8 @@ class VersusGame {
         ctx.roundRect(xPos, yPos, BLOCK_SIZE, BLOCK_SIZE, 8);
         ctx.fill();
         
-        // Draw symbol with gentler animation
-        const symbol = this.blockSymbols[blockType];
+        // Choose the appropriate symbol based on whether it's an AI block or player block
+        const symbol = this.getBlockSymbol(blockType, isAiBlock);
         if (symbol) {
             ctx.font = '30px Arial';
             ctx.textAlign = 'center';
@@ -1028,49 +1073,61 @@ class VersusGame {
         ctx.restore();
     }
     
-    getBlockColor(element) {
+    getBlockColor(element, isAiBlock) {
         // Use cached colors
-        return this.blockColors[element] || '#ffffff';
+        const blockColors = isAiBlock ? this.aiBlockColors : this.blockColors;
+        return blockColors[element] || '#ffffff';
+    }
+    
+    getBlockSymbol(element, isAiBlock) {
+        // Use cached symbols
+        const blockSymbols = isAiBlock ? this.aiBlockSymbols : this.blockSymbols;
+        return blockSymbols[element];
     }
     
     drawPreviewRow(ctx, gameState) {
-        ctx.save();
+        if (!gameState.risingState.previewRow) return;
+        
+        const previewRow = [...gameState.risingState.previewRow];
+        const isAiBlock = gameState === this.aiState;
+        
+        // Calculate rising offset
+        const offsetY = GRID_Y - gameState.risingState.offset;
         
         for (let x = 0; x < GRID_X; x++) {
-            const blockType = gameState.risingState.previewRow[x];
-            
-            // Calculate precise pixel positions once
-            const xPos = Math.round(GRID_PADDING + (x * (BLOCK_SIZE + GAP)));
-            const yPos = Math.round(GRID_PADDING + ((GRID_Y - gameState.risingState.offset) * (BLOCK_SIZE + GAP)));
-            const centerX = Math.round(xPos + (BLOCK_SIZE/2));
-            const centerY = Math.round(yPos + (BLOCK_SIZE/2));
-            
-            // Draw block with reduced opacity
-            ctx.globalAlpha = 0.3;
-            ctx.fillStyle = this.getBlockColor(blockType);
-            ctx.beginPath();
-            ctx.roundRect(xPos, yPos, BLOCK_SIZE, BLOCK_SIZE, 8);
-            ctx.fill();
-            
-            // Draw symbol
-            const symbol = this.blockSymbols[blockType];
-            if (symbol) {
-                ctx.font = '30px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
+            if (x < previewRow.length) {
+                const blockType = previewRow[x];
                 
-                // Add strong black shadow
-                ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                ctx.shadowBlur = 4;
-                ctx.shadowOffsetX = 2;
-                ctx.shadowOffsetY = 2;
+                // Calculate precise pixel positions
+                const xPos = GRID_PADDING + (x * (BLOCK_SIZE + GAP));
+                const yPos = GRID_PADDING + (offsetY * (BLOCK_SIZE + GAP));
+                const centerX = xPos + (BLOCK_SIZE/2);
+                const centerY = yPos + (BLOCK_SIZE/2);
                 
-                ctx.fillStyle = 'white';
-                ctx.fillText(symbol, centerX, centerY);
+                // Draw block with reduced opacity
+                ctx.globalAlpha = 0.3;
+                ctx.fillStyle = this.getBlockColor(blockType, isAiBlock);
+                ctx.beginPath();
+                ctx.roundRect(xPos, yPos, BLOCK_SIZE, BLOCK_SIZE, 8);
+                ctx.fill();
+                
+                // Draw symbol
+                const symbol = this.getBlockSymbol(blockType, isAiBlock);
+                if (symbol) {
+                    ctx.font = '30px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.shadowColor = 'rgba(0,0,0,0.2)';
+                    ctx.shadowBlur = 4;
+                    ctx.shadowOffsetX = 1;
+                    ctx.shadowOffsetY = 1;
+                    
+                    ctx.fillText(symbol, centerX, centerY);
+                }
+                ctx.globalAlpha = 1;
             }
         }
-        
-        ctx.restore();
     }
     
     drawFloatingScores(ctx, gameState, currentTime) {
@@ -1396,39 +1453,26 @@ class VersusGame {
         this.timerState.isRunning = false;
         
         // Update modal content
-        const gameOverTitle = document.getElementById('gameOverTitle');
-        const gameOverMessage = document.getElementById('gameOverMessage');
+        this.gameOverTitle.textContent = winner === 'player' ? 'YOU WIN!' : winner === 'ai' ? 'YOU LOSE!' : 'DRAW!';
+        this.gameOverTitle.style.color = winner === 'player' ? '#4a90e2' : winner === 'ai' ? '#e24a4a' : '#ffd93d';
+        this.gameOverMessage.textContent = winner === 'player' ? 'The AI couldn\'t keep up with your skills!' : winner === 'ai' ? 'The AI has defeated you this time!' : 'Both you and the AI reached the top at the same time!';
         
-        if (winner === 'player') {
-            gameOverTitle.textContent = 'YOU WIN!';
-            gameOverTitle.style.color = '#4a90e2';
-            gameOverMessage.textContent = 'The AI couldn\'t keep up with your skills!';
-        } else if (winner === 'ai') {
-            gameOverTitle.textContent = 'YOU LOSE!';
-            gameOverTitle.style.color = '#e24a4a';
-            gameOverMessage.textContent = 'The AI has defeated you this time!';
-        } else {
-            gameOverTitle.textContent = 'DRAW!';
-            gameOverTitle.style.color = '#ffd93d';
-            gameOverMessage.textContent = 'Both you and the AI reached the top at the same time!';
-        }
-        
-        document.getElementById('finalPlayerScore').textContent = this.playerState.score;
-        document.getElementById('finalAiScore').textContent = this.aiState.score;
-        document.getElementById('finalDifficulty').textContent = this.speedState.difficulty.toUpperCase();
+        this.finalPlayerScoreDisplay.textContent = this.playerState.score;
+        this.finalAiScoreDisplay.textContent = this.aiState.score;
+        this.finalDifficultyDisplay.textContent = this.speedState.difficulty.toUpperCase();
         
         // Show the modal
-        const modal = document.getElementById('gameOverModal');
-        modal.style.display = 'block';
+        this.gameOverModal.style.display = 'block';
     }
     
     resetGame() {
         // Hide the modal
-        document.getElementById('gameOverModal').style.display = 'none';
+        this.gameOverModal.style.display = 'none';
         
         // Get current saved speed setting
         const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
-        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'normal';
+        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'easy';
+        const savedAiDifficulty = parseInt(localStorage.getItem('aiDifficulty')) || 2;
         
         // Update speed state with saved values
         this.speedState = {
@@ -1532,14 +1576,15 @@ class VersusGame {
         
         // Reinitialize AI
         this.ai = new AIPlayer(this.aiState);
+        this.ai.setDifficulty(savedAiDifficulty);
         
         // Reset grids and preview rows
         this.initGrids();
         this.generatePreviewRows();
         
         // Reset UI
-        document.getElementById('playerScoreValue').textContent = '0';
-        document.getElementById('aiScoreValue').textContent = '0';
+        this.playerScoreDisplay.textContent = '0';
+        this.aiScoreDisplay.textContent = '0';
         
         // Reset timer
         this.timerState = {
@@ -1547,7 +1592,7 @@ class VersusGame {
             currentTime: 0,
             isRunning: true
         };
-        document.getElementById('gameTimer').textContent = '00:00';
+        this.timerDisplay.textContent = '00:00';
         
         // Update the speed display
         this.updateSpeedDisplay();
@@ -1596,11 +1641,20 @@ class VersusGame {
     
     updateSpeedDisplay() {
         // Update the display in the info box
-        const currentDifficulty = document.getElementById('currentDifficulty');
-        const currentSpeed = document.getElementById('currentSpeed');
-        if (currentDifficulty && currentSpeed) {
-            currentDifficulty.textContent = this.speedState.difficulty.toUpperCase();
-            currentSpeed.textContent = this.speedState.currentSpeed;
+        this.speedDisplay.textContent = this.speedState.currentSpeed;
+        this.difficultyDisplay.textContent = this.speedState.difficulty.toUpperCase();
+        
+        // Update AI difficulty display
+        const aiDifficultyLabels = {
+            1: 'VERY EASY',
+            2: 'EASY',
+            3: 'NORMAL',
+            4: 'HARD',
+            5: 'VERY HARD'
+        };
+        
+        if (this.ai && this.aiDifficultyDisplay) {
+            this.aiDifficultyDisplay.textContent = aiDifficultyLabels[this.ai.difficultyLevel] || 'NORMAL';
         }
     }
     
@@ -1617,10 +1671,7 @@ class VersusGame {
         const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         
         // Update display
-        const timerDisplay = document.getElementById('gameTimer');
-        if (timerDisplay) {
-            timerDisplay.textContent = formattedTime;
-        }
+        this.timerDisplay.textContent = formattedTime;
     }
     
     initAudio() {
@@ -1690,6 +1741,12 @@ class VersusGame {
             }
         };
 
+        // Special AI theme with robot/tech emojis
+        this.aiThemeSymbols = {
+            'fire': '🤖', 'water': '💻', 'earth': '🔋',
+            'air': '📱', 'heart': '⚙️'
+        };
+
         this.themeColors = {
             'theme-elements': {
                 'fire': '#FF4D00', 'water': '#00B4D8', 'earth': '#00CC6A',
@@ -1716,11 +1773,24 @@ class VersusGame {
                 'air': '#FFD93D', 'heart': '#9D4EDD'
             }
         };
+        
+        // Special AI theme colors with tech-inspired colors
+        this.aiThemeColors = {
+            'fire': '#FF0055', 'water': '#00DDFF', 'earth': '#00FF66',
+            'air': '#FFDD00', 'heart': '#BB00FF'
+        };
     }
     
     updateTheme(theme) {
-        this.blockSymbols = this.themeSymbols[theme];
-        this.blockColors = this.themeColors[theme];
+        // For player blocks, use the selected theme
+        this.playerBlockSymbols = this.themeSymbols[theme];
+        this.playerBlockColors = this.themeColors[theme];
+        
+        // For AI blocks, always use the AI theme
+        this.aiBlockSymbols = this.aiThemeSymbols;
+        this.aiBlockColors = this.aiThemeColors;
+        
+        // Update the body class for background styling
         document.body.className = theme;
         
         // Update background emojis with new theme

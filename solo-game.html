@@ -6,7 +6,6 @@
     <title>Dr. Rohrs Meddlleague</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Chakra+Petch:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/themes.css">
     <link rel="stylesheet" href="css/animations.css">
     <style>
         /* Canvas-specific styles */
@@ -30,11 +29,13 @@
             display: inline-block;
             margin-top: 70px;
             width: fit-content;
+            box-sizing: border-box;
+            transition: box-shadow 0.3s ease;
+            background: rgba(0,0,0,0.2);
         }
         #gameCanvas {
-            position: relative;
-            border-radius: 15px;
-            background: rgba(0,0,0,0.3);
+            display: block;
+            border-radius: 12px;
             box-shadow: 0 0 30px rgba(255,87,184,0.2);
         }
     </style>
