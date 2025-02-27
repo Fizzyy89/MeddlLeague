@@ -1074,15 +1074,15 @@ class VersusGame {
     }
     
     getBlockColor(element, isAiBlock) {
-        // Use cached colors
-        const blockColors = isAiBlock ? this.aiBlockColors : this.blockColors;
+        // Use the correct theme colors based on whether it's an AI block or player block
+        const blockColors = isAiBlock ? this.aiBlockColors : this.playerBlockColors;
         return blockColors[element] || '#ffffff';
     }
     
     getBlockSymbol(element, isAiBlock) {
-        // Use cached symbols
-        const blockSymbols = isAiBlock ? this.aiBlockSymbols : this.blockSymbols;
-        return blockSymbols[element];
+        // Use the correct theme symbols based on whether it's an AI block or player block
+        const blockSymbols = isAiBlock ? this.aiBlockSymbols : this.playerBlockSymbols;
+        return blockSymbols[element] || element;
     }
     
     drawPreviewRow(ctx, gameState) {
