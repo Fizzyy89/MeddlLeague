@@ -44,95 +44,6 @@ h1 {
   font-size: 1.2em;
 }
 
-/* Game Container and Grid */
-.game-container {
-  position: relative;
-  display: inline-block;
-  background: rgba(0,0,0,0.3);
-  padding: 15px;
-  border-radius: 15px;
-  border: 2px solid #4a4a4a;
-  box-shadow: 0 0 30px rgba(255,87,184,0.2);
-  margin-top: 70px;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(8, 50px);
-  grid-template-rows: repeat(16, 50px);
-  gap: 3px;
-  padding: 5px;
-  border-radius: 8px;
-}
-
-/* Block Styles */
-.block {
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0;
-  border-radius: 8px;
-  transition: transform 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  text-shadow: 0 0 5px rgba(0,0,0,0.7), 0 0 3px black;
-  filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
-}
-
-.block::before {
-  content: '';
-  font-size: 28px;
-}
-
-.block::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(45deg, rgba(255,255,255,0.15) 0%, transparent 50%, rgba(0,0,0,0.1) 100%);
-}
-
-/* Cursor Styles */
-.cursor-container {
-  position: absolute;
-  pointer-events: none;
-  z-index: 2;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
-
-.cursor-block {
-  position: absolute;
-  width: 56px;
-  height: 56px;
-  border: 3px solid #fff;
-  box-sizing: border-box;
-  transition: transform 0.1s ease-out;
-  margin-left: -3px;
-  margin-top: -3px;
-  animation: cursorGlow 1.5s infinite linear;
-  border-radius: 8px;
-}
-
-.cursor-block::before {
-  content: '';
-  position: absolute;
-  top: -3px;
-  left: -3px;
-  right: -3px;
-  bottom: -3px;
-  border-radius: 8px;
-  border: 2px solid rgba(255,255,255,0.6);
-  pointer-events: none;
-  animation: pulseGlow 1s ease-in-out infinite;
-}
-
 /* Info Box */
 .info-box {
   position: fixed;
@@ -143,13 +54,13 @@ h1 {
   background: rgba(0, 0, 0, 0.85);
   padding: 20px 15px;
   border-radius: 8px;
-  border: 3px solid #ffd93d;
+  border: 3px solid var(--accent-color);
   max-width: 300px;
   font-size: 0.85em;
   line-height: 1.8;
-  box-shadow: 0 0 20px rgba(255, 217, 61, 0.3),
-              0 0 40px rgba(255, 217, 61, 0.15);
-  transform: translateZ(0);
+  box-shadow: 
+    0 0 20px rgba(255, 217, 61, 0.3),
+    0 0 40px rgba(255, 217, 61, 0.15);
   text-align: left;
   z-index: 10;
   font-family: 'Chakra Petch', sans-serif;
@@ -165,8 +76,8 @@ h1 {
   bottom: 20px;
   transform: translateX(-150%);
   background: rgba(0, 0, 0, 0.85);
-  border: 3px solid #ffd93d;
-  color: #ffd93d;
+  border: 3px solid var(--accent-color);
+  color: var(--accent-color);
   padding: 8px 12px;
   cursor: pointer;
   font-family: 'Press Start 2P', cursive;
@@ -191,16 +102,29 @@ h1 {
   transform: translateX(-150%);
 }
 
+/* Info Box Typography */
+.info-box h1, 
+.info-box h2 {
+  font-family: 'Press Start 2P', cursive;
+  color: var(--accent-color);
+  text-align: center;
+  text-shadow: 0 0 15px rgba(255,217,61,0.5);
+}
+
 .info-box h1 {
   font-size: 1.8em;
   margin: 0 0 15px 0;
-  text-align: center;
-  color: #ffd93d;
-  text-shadow: 0 0 15px rgba(255,217,61,0.5);
   letter-spacing: 2px;
-  font-family: 'Press Start 2P', cursive;
 }
 
+.info-box h2 {
+  font-size: 1.4em;
+  margin: 0 0 10px 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(255, 217, 61, 0.3);
+}
+
+/* Info Box Score Display */
 .info-box .score-display {
   margin: 15px 0;
   padding: 15px 0;
@@ -217,35 +141,23 @@ h1 {
 }
 
 .info-box .score-display span {
-  color: #ffd93d;
+  color: var(--accent-color);
   font-size: 1.1em;
   text-shadow: 
     0 0 15px rgba(255,217,61,0.8),
     0 0 25px rgba(255,217,61,0.4);
 }
 
-.info-box h2 { 
-  color: #ffd93d;
-  margin: 0 0 10px 0; 
-  font-size: 1.4em;
-  text-shadow: 0 0 8px rgba(255, 217, 61, 0.4);
-  padding-bottom: 10px;
-  border-bottom: 2px solid rgba(255, 217, 61, 0.3);
-  text-align: center;
-  font-family: 'Press Start 2P', cursive;
+/* Info Box List */
+.info-box ul {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0 0;
 }
 
-.info-box ul { 
-  list-style: none; 
-  padding: 0; 
-  margin: 0;
-  margin-top: 15px;
-}
-
-.info-box li { 
+.info-box li {
   margin: 12px 0;
-  padding-left: 20px;
-  padding-right: 5px;
+  padding: 0 5px 0 20px;
   position: relative;
   font-size: 1.1em;
   letter-spacing: 0.5px;
@@ -254,84 +166,53 @@ h1 {
 
 .info-box li::before {
   content: '→';
-  color: #ffd93d;
+  color: var(--accent-color);
   position: absolute;
   left: 0;
   top: 0.15em;
-  transform: none;
-  font-size: 1em;
   text-shadow: 0 0 8px rgba(255, 217, 61, 0.4);
-  font-family: 'Chakra Petch', sans-serif;
 }
 
-/* Style both selects in the info box consistently */
+/* Info Box Select Elements */
 .info-box select {
-  font-family: 'Press Start 2P', cursive;
+  width: 100%;
   padding: 8px 10px;
   margin: 10px auto;
   background: rgba(0, 0, 0, 0.9);
   color: #fff;
   border: 2px solid;
-  border-image: linear-gradient(45deg, #ffd93d, #ff6b6b) 1;
+  border-image: linear-gradient(45deg, var(--accent-color), var(--glow-color)) 1;
   border-radius: 0;
   cursor: pointer;
   transition: all 0.3s ease;
-  width: 100%;
+  font-family: 'Press Start 2P', cursive;
   font-size: 0.8em;
 }
 
 .info-box select:hover {
   background: rgba(255, 217, 61, 0.1);
-  border-image: linear-gradient(45deg, #ff6b6b, #ffd93d) 1;
+  border-image: linear-gradient(45deg, var(--glow-color), var(--accent-color)) 1;
 }
 
 .info-box select option {
-  background: #000 !important;
-  color: #fff !important;
-  font-family: 'Press Start 2P', cursive;
-  font-size: 0.8em;
+  background: #000;
+  color: #fff;
   padding: 8px;
 }
 
+/* Theme and Difficulty Sections */
+.theme-select,
 .difficulty-select {
-  margin: 10px 0;
+  margin-top: 15px;
   padding-top: 15px;
   border-top: 1px solid rgba(255, 217, 61, 0.2);
 }
 
 .difficulty-select label {
-  color: #ffd93d;
-  margin-right: 10px;
+  color: var(--accent-color);
   display: block;
-  margin-bottom: 8px;
+  margin: 0 10px 8px 0;
   font-size: 0.9em;
-}
-
-/* Theme Select */
-.theme-select {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid rgba(255,255,255,0.2);
-}
-
-.theme-select select {
-  font-family: 'Press Start 2P', cursive;
-  padding: 8px 10px;
-  margin: 10px auto;
-  background: rgba(0, 0, 0, 0.9);
-  color: #fff;
-  border: 2px solid;
-  border-image: linear-gradient(45deg, #ffd93d, #ff6b6b) 1;
-  border-radius: 0;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 100%;
-  font-size: 0.8em;
-}
-
-.theme-select select:focus {
-  outline: none;
-  border-image: linear-gradient(45deg, #ff6b6b, #ffd93d) 1;
 }
 
 /* Volume Control */

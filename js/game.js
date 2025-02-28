@@ -189,7 +189,7 @@ class CanvasGame {
         const totalAvailableWidth = window.innerWidth - 80; // Subtract margins
         
         // Limit max width while allowing it to grow with screen size
-        const maxWidth = Math.min(560, totalAvailableWidth);
+        const maxWidth = Math.min(500, totalAvailableWidth); // Changed from 560 to 480 to match versus
         
         // Calculate available height (accounting for UI elements)
         const availableHeight = window.innerHeight - 200; // -200 for margins/UI
@@ -199,8 +199,8 @@ class CanvasGame {
         const maxScaleY = availableHeight / this.baseHeight;
         
         // Set minimum and maximum scales
-        const minScale = 0.6;    // Allow scaling down for small screens
-        const maxScale = 1.8;    // Limit maximum scaling
+        const minScale = 0.4;    // Changed from 0.6 to 0.4 to match versus
+        const maxScale = 1.2;    // Changed from 1.8 to 1.2 to match versus
         
         // Calculate optimal scale
         this.scale = Math.min(maxScaleX, maxScaleY, maxScale);

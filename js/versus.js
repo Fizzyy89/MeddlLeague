@@ -273,8 +273,8 @@ class VersusGame {
         // Calculate available width for each canvas
         const totalAvailableWidth = window.innerWidth - 120; // Subtract margin and gap
         const maxWidthPerCanvas = isWideScreen 
-            ? Math.min(480, totalAvailableWidth / 2) // Side by side - limit each canvas width
-            : Math.min(480, totalAvailableWidth - 40); // Stacked - allow more width for single column
+            ? Math.min(500, totalAvailableWidth / 2) // Side by side - limit each canvas width
+            : Math.min(500, totalAvailableWidth - 40); // Stacked - allow more width for single column
         
         // Calculate available height (accounting for UI elements)
         const availableHeight = isWideScreen
