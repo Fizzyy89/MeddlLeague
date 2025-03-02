@@ -1253,7 +1253,7 @@ class CanvasGame {
         if (this.fallingBlocks.size === 0) return;
         
         let allBlocksLanded = true;
-        const fallDuration = 150; // Duration of fall animation in ms
+        const fallDuration = 300; // Increased from 150ms to 300ms to match versus.js for slower, more visible falling
         
         this.fallingBlocks.forEach(key => {
             const [x, targetY] = key.split(',').map(Number);
@@ -1271,8 +1271,11 @@ class CanvasGame {
                 this.grid[targetY][x] = block.type;
                 this.fallingBlocks.delete(key);
             } else {
-                // Update block position with clamping
-                const newY = block.startY + (block.targetY - block.startY) * progress;
+                // Use easing for smoother acceleration
+                const easedProgress = this.easeInOutQuad(progress);
+                
+                // Update block position with easing
+                const newY = block.startY + easedProgress * (block.targetY - block.startY);
                 block.currentY = Math.min(newY, block.targetY);
                 allBlocksLanded = false;
             }
@@ -1758,6 +1761,11 @@ class CanvasGame {
         if (timerDisplay) {
             timerDisplay.textContent = formattedTime;
         }
+    }
+
+    // Quadratic easing function for smoother animations
+    easeInOutQuad(t) {
+        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
     }
 }
 

@@ -926,7 +926,14 @@ class VersusGame {
         // Check each column from bottom to top
         for (let x = 0; x < GRID_X; x++) {
             for (let y = GRID_Y - 2; y >= 0; y--) {
-                if (gameState.grid[y][x] && !gameState.grid[y + 1][x]) {
+                const currentBlock = gameState.grid[y][x];
+                
+                // Skip angry blocks - they should stay fixed in position
+                if (currentBlock && typeof currentBlock === 'object' && currentBlock.state === 'angry') {
+                    continue;
+                }
+                
+                if (currentBlock && !gameState.grid[y + 1][x]) {
                     // Found a block that can fall
                     let fallDistance = 1;
                     let targetY = y + 1;
@@ -937,11 +944,17 @@ class VersusGame {
                         continue; // Can't fall
                     }
                     
-                    // Find how far it can fall
+                    // Find how far it can fall, stopping at angry blocks
                     while (targetY + 1 < GRID_Y && !gameState.grid[targetY + 1][x]) {
                         // Before increasing the fall distance, check if there's a garbage block in the way
                         if (this.isPositionInsideGarbage(gameState, x, targetY + 1)) {
                             break; // Stop at this position, can't fall further
+                        }
+                        
+                        // Check if there's an angry block below
+                        const blockBelow = gameState.grid[targetY + 1][x];
+                        if (blockBelow && typeof blockBelow === 'object' && blockBelow.state === 'angry') {
+                            break; // Stop at this position, can't fall through an angry block
                         }
                         
                         fallDistance++;
@@ -950,7 +963,7 @@ class VersusGame {
                     
                     // Create falling block object
                     const block = {
-                        type: typeof gameState.grid[y][x] === 'object' ? gameState.grid[y][x].type : gameState.grid[y][x],
+                        type: typeof currentBlock === 'object' ? currentBlock.type : currentBlock,
                         state: 'falling',
                         startY: y,
                         targetY: targetY,
@@ -986,18 +999,17 @@ class VersusGame {
     }
     
     updateFallingBlocks(gameState, currentTime) {
-        // Skip updating falling blocks if there are any angry blocks
-        if (this.hasAngryBlocks(gameState)) return;
-        
+        // Process all falling blocks regardless of angry blocks elsewhere        
         if (gameState.fallingBlocks.size === 0) return;
         
         let allBlocksLanded = true;
-        const fallDuration = 150; // Duration of fall animation in ms
+        const fallDuration = 300; // Duration of fall animation in ms (matching garbage blocks)
         
         gameState.fallingBlocks.forEach(key => {
             const [x, targetY] = key.split(',').map(Number);
             const block = gameState.grid[targetY][x];
             
+            // Skip if the block doesn't exist or isn't in a falling state
             if (!block || block.state !== 'falling') {
                 gameState.fallingBlocks.delete(key);
                 return;
@@ -1010,8 +1022,11 @@ class VersusGame {
                 gameState.grid[targetY][x] = block.type;
                 gameState.fallingBlocks.delete(key);
             } else {
-                // Update block position with clamping
-                const newY = block.startY + (block.targetY - block.startY) * progress;
+                // Use easing for smoother acceleration (matching garbage blocks)
+                const easedProgress = this.easeInOutQuad(progress);
+                
+                // Update block position with easing (matching garbage style)
+                const newY = block.startY + easedProgress * (block.targetY - block.startY);
                 block.currentY = Math.min(newY, block.targetY);
                 allBlocksLanded = false;
             }
@@ -1049,6 +1064,7 @@ class VersusGame {
         // Use requestAnimationFrame timestamp for smoother animations
         const currentTime = performance.now();
         
+        // Handle falling blocks
         if (blockState === 'falling') {
             // For falling blocks, use the currentY relative to grid position
             drawY = block.currentY - gameState.risingState.offset;
@@ -2688,16 +2704,8 @@ class VersusGame {
         const affectedIndices = Array.from(affectedGarbage).sort((a, b) => b - a);
         
         for (const index of affectedIndices) {
-            const garbage = gameState.garbageBlocks[index];
-            
-            // For horizontal garbage blocks or the bottom row of vertical garbage
-            if (garbage.height === 1 || (garbage.height > 1 && garbage.clearProgress === garbage.height - 1)) {
-                // Clear the entire garbage block
-                this.clearGarbageBlock(gameState, index);
-            } else {
-                // For taller garbage blocks, clear one row at a time from bottom
-                this.partiallyConvertGarbage(gameState, index);
-            }
+            // Always clear the entire garbage block, regardless of height
+            this.clearGarbageBlock(gameState, index);
         }
     }
     
@@ -2931,9 +2939,7 @@ class VersusGame {
     }
 
     updateFallingGarbage(gameState, currentTime) {
-        // Skip updating falling garbage if there are any angry blocks
-        if (this.hasAngryBlocks(gameState)) return;
-        
+        // Process falling garbage blocks even if there are angry blocks elsewhere
         if (gameState.garbageBlocks.length === 0) return;
         
         const fallDuration = 300; // Duration of fall animation in ms (faster now)
@@ -3015,8 +3021,15 @@ class VersusGame {
                     let blocked = false;
                     
                     for (let y = bottomY + 1; y < GRID_Y; y++) {
-                        // Stop if we hit a regular block
-                        if (gameState.grid[y][x]) {
+                        // Stop if we hit a regular block or an angry block
+                        const blockBelow = gameState.grid[y][x];
+                        if (blockBelow) {
+                            // Specifically check for angry blocks
+                            if (typeof blockBelow === 'object' && blockBelow.state === 'angry') {
+                                blocked = true;
+                                break;
+                            }
+                            // Or any other block type
                             blocked = true;
                             break;
                         }
@@ -3123,13 +3136,15 @@ class VersusGame {
             const otherGarbage = gameState.garbageBlocks[i];
             
             // Check if directly stacked (one on top of the other)
+            // We only consider vertical stacking, not horizontal adjacency
+            // This allows garbage blocks to fall independently even if they're horizontally adjacent
             const isDirectlyAbove = 
                 otherGarbage.y + otherGarbage.height === garbage.y && // otherGarbage sits directly on top of garbage
-                this.garbageBlocksOverlap(otherGarbage, garbage);
+                this.garbageBlocksFullyOverlap(otherGarbage, garbage);
                 
             const isDirectlyBelow = 
                 garbage.y + garbage.height === otherGarbage.y && // garbage sits directly on top of otherGarbage
-                this.garbageBlocksOverlap(garbage, otherGarbage);
+                this.garbageBlocksFullyOverlap(garbage, otherGarbage);
             
             if (isDirectlyAbove || isDirectlyBelow) {
                 // Add to stack and mark as processed
@@ -3140,6 +3155,13 @@ class VersusGame {
                 this.findGarbageInStack(gameState, i, stack, processed);
             }
         }
+    }
+    
+    // Check if two garbage blocks fully overlap horizontally (stricter than partial overlap)
+    garbageBlocksFullyOverlap(garbage1, garbage2) {
+        // For blocks to be considered in the same vertical stack, they must have the same width 
+        // and be perfectly aligned horizontally (same x-coordinate)
+        return garbage1.x === garbage2.x && garbage1.width === garbage2.width;
     }
     
     // Check if two garbage blocks overlap horizontally
