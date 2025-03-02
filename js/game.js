@@ -112,6 +112,9 @@ class CanvasGame {
         // Add floating scores array
         this.floatingScores = [];
         
+        // Add match count pop-ups array
+        this.matchCountPopups = [];
+        
         // Add flag to track if blocks are falling from a chain
         this.fallingFromChain = false;
         
@@ -718,7 +721,7 @@ class CanvasGame {
         
         // Calculate screen position
         const screenX = GRID_PADDING + (x * (BLOCK_SIZE + GAP)) + BLOCK_SIZE/2;
-        const screenY = GRID_PADDING + (y * (BLOCK_SIZE + GAP));
+        const screenY = GRID_PADDING + (y * (BLOCK_SIZE + GAP)) + BLOCK_SIZE/2;
         
         this.floatingScores.push({
             baseScore,
@@ -728,6 +731,24 @@ class CanvasGame {
             y: screenY,
             startTime: performance.now(),
             duration: 1000, // 1 second animation
+            opacity: 1
+        });
+    }
+
+    addMatchCountPopup(x, y, matchCount) {
+        // Only show for matches of 4 or more
+        if (matchCount < 4) return;
+        
+        // Calculate screen position (center of the matched blocks)
+        const screenX = GRID_PADDING + (x * (BLOCK_SIZE + GAP)) + BLOCK_SIZE/2;
+        const screenY = GRID_PADDING + (y * (BLOCK_SIZE + GAP)) + BLOCK_SIZE/2;
+        
+        this.matchCountPopups.push({
+            count: matchCount,
+            x: screenX,
+            y: screenY,
+            startTime: performance.now(),
+            duration: 1500, // Longer duration for the full animation
             opacity: 1
         });
     }
@@ -742,7 +763,7 @@ class CanvasGame {
             
             this.ctx.save();
             this.ctx.textAlign = 'center';
-            this.textBaseline = 'middle';
+            this.ctx.textBaseline = 'middle';
             
             if (score.multiplier > 1) {
                 // Draw total score first (centered)
@@ -759,6 +780,119 @@ class CanvasGame {
                 this.ctx.font = 'bold 24px "Press Start 2P"';
                 this.ctx.fillStyle = `rgba(255,255,255,${opacity})`;
                 this.ctx.fillText(`${score.baseScore}`, score.x, y);
+            }
+            
+            this.ctx.restore();
+            return true;
+        });
+    }
+
+    drawMatchCountPopups(currentTime) {
+        this.matchCountPopups = this.matchCountPopups.filter(popup => {
+            const progress = (currentTime - popup.startTime) / popup.duration;
+            if (progress >= 1) return false;
+            
+            this.ctx.save();
+            
+            // Animation phases:
+            // 1. Appear and grow (0-20%)
+            // 2. Spin around once (20-60%)
+            // 3. Evaporate/dissolve (60-100%)
+            
+            // Calculate scale based on phase
+            let scale;
+            if (progress < 0.2) {
+                // Phase 1: Grow from 0.5 to 1.2 (slight overshoot)
+                scale = 0.5 + (progress / 0.2) * 0.7;
+            } else if (progress < 0.6) {
+                // Phase 2: Maintain slightly larger scale during spin
+                scale = 1.2;
+            } else {
+                // Phase 3: Grow larger while fading out
+                scale = 1.2 + ((progress - 0.6) / 0.4) * 0.8;
+            }
+            
+            // Calculate rotation based on phase
+            let rotation = 0;
+            if (progress >= 0.2 && progress < 0.6) {
+                // Complete one full rotation during phase 2
+                rotation = ((progress - 0.2) / 0.4) * Math.PI * 2;
+            }
+            
+            // Calculate opacity based on phase
+            let opacity;
+            if (progress < 0.2) {
+                // Phase 1: Fade in
+                opacity = progress / 0.2;
+            } else if (progress < 0.6) {
+                // Phase 2: Full opacity
+                opacity = 1;
+            } else {
+                // Phase 3: Fade out
+                opacity = 1 - ((progress - 0.6) / 0.4);
+            }
+            
+            // Apply transformations
+            this.ctx.translate(popup.x, popup.y);
+            this.ctx.rotate(rotation);
+            this.ctx.scale(scale, scale);
+            
+            // Determine color based on match count
+            let color;
+            if (popup.count >= 6) {
+                color = `rgba(255,50,50,${opacity})`; // Red for 6+
+            } else if (popup.count >= 5) {
+                color = `rgba(255,165,0,${opacity})`; // Orange for 5
+            } else {
+                color = `rgba(50,50,255,${opacity})`; // Blue for 4
+            }
+            
+            // Draw box background
+            const boxWidth = 40;
+            const boxHeight = 40;
+            
+            // Add glow effect
+            this.ctx.shadowColor = color;
+            this.ctx.shadowBlur = 10;
+            
+            // Draw rounded rectangle box
+            this.ctx.fillStyle = `rgba(0,0,0,${opacity * 0.7})`;
+            this.ctx.beginPath();
+            this.ctx.roundRect(-boxWidth/2, -boxHeight/2, boxWidth, boxHeight, 8);
+            this.ctx.fill();
+            
+            // Add border
+            this.ctx.strokeStyle = color;
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+            
+            // Draw number
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.font = 'bold 24px "Press Start 2P"';
+            
+            // Draw text
+            this.ctx.fillStyle = color;
+            this.ctx.fillText(`${popup.count}`, 0, 0);
+            
+            // Phase 3: Add particles for evaporation effect
+            if (progress >= 0.6) {
+                const particleCount = 8;
+                const evaporateProgress = (progress - 0.6) / 0.4;
+                const particleDistance = evaporateProgress * 30;
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const angle = (i / particleCount) * Math.PI * 2;
+                    const particleX = Math.cos(angle) * particleDistance;
+                    const particleY = Math.sin(angle) * particleDistance;
+                    const particleSize = 4 * (1 - evaporateProgress);
+                    const particleOpacity = opacity * (1 - evaporateProgress);
+                    
+                    this.ctx.fillStyle = `rgba(255,255,255,${particleOpacity})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
             }
             
             this.ctx.restore();
@@ -832,19 +966,15 @@ class CanvasGame {
         }
 
         // Play match size sound effect
-        audioManager.playMatchSound(matches.length);
+        audioManager.playMatchSound(matches.length, false);
 
         // Increment chain counter if this is part of a chain
         if (isChain) {
             this.chainCounter++;
             
             // Play chain sound based on chain level
-            if (this.chainCounter === 1) {
-                audioManager.playSound('chain1');
-            } else if (this.chainCounter === 2) {
-                audioManager.playSound('chain2');
-            } else if (this.chainCounter >= 3) {
-                audioManager.playSound('chain3');
+            if (this.chainCounter >= 1) {
+                audioManager.playChainSound(this.chainCounter, false);
             }
             
             // Activate chain display
@@ -865,6 +995,11 @@ class CanvasGame {
         // Add floating score at the center of the match
         const centerMatch = matches[Math.floor(matches.length / 2)];
         this.addFloatingScore(centerMatch.x, centerMatch.y, baseScore, this.chainCounter);
+        
+        // Add match count popup for matches of 4 or more
+        if (matches.length >= 4) {
+            this.addMatchCountPopup(centerMatch.x, centerMatch.y, matches.length);
+        }
         
         this.score += matchScore;
         document.getElementById('scoreValue').textContent = this.score;
@@ -901,7 +1036,7 @@ class CanvasGame {
                             state: 'popping',
                             animationStart: performance.now()
                         };
-                        audioManager.playPopSound();
+                        audioManager.playPopSound(false);
                     }
                 }, index * 200);
                 
@@ -1207,6 +1342,7 @@ class CanvasGame {
         
         this.drawPreviewRow();
         this.drawFloatingScores(currentTime);
+        this.drawMatchCountPopups(currentTime);
         this.drawChainIndicator(currentTime);
         this.drawCursor();
         
@@ -1515,6 +1651,8 @@ class CanvasGame {
         this.fallingBlocks.clear();
         this.chainCounter = 0;
         this.fallingFromChain = false;
+        this.floatingScores = [];
+        this.matchCountPopups = [];
         
         // Reset danger state
         this.dangerState = {

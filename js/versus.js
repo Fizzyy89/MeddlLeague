@@ -6,6 +6,9 @@ class VersusGame {
     constructor() {
         console.log("Initializing Versus game");
         
+        // Default theme
+        this.currentTheme = 'theme-elements';
+        
         // Game canvas elements
         this.bgCanvas = document.getElementById('bgCanvas');
         this.playerCanvas = document.getElementById('playerCanvas');
@@ -96,6 +99,7 @@ class VersusGame {
             chainCounter: 0,
             chainTimer: null,
             floatingScores: [],
+            matchCountPopups: [],
             fallingFromChain: false,
             chainDisplay: {
                 active: false,
@@ -126,7 +130,10 @@ class VersusGame {
                 speed: this.calculateRisingSpeed(savedSpeed),
                 nextRow: [],
                 previewRow: []
-            }
+            },
+            // Garbage block tracking
+            garbageBlocks: [],
+            pendingGarbage: []
         };
         
         // Game state initialization for AI
@@ -142,6 +149,7 @@ class VersusGame {
             chainCounter: 0,
             chainTimer: null,
             floatingScores: [],
+            matchCountPopups: [],
             fallingFromChain: false,
             chainDisplay: {
                 active: false,
@@ -170,7 +178,10 @@ class VersusGame {
                 speed: this.calculateRisingSpeed(savedSpeed),
                 nextRow: [],
                 previewRow: []
-            }
+            },
+            // Garbage block tracking
+            garbageBlocks: [],
+            pendingGarbage: []
         };
         
         // Cache commonly used symbol mappings and colors
@@ -392,6 +403,69 @@ class VersusGame {
         if (!block) return null;
         return typeof block === 'object' ? block.type : block;
     }
+    
+    // Generate garbage blocks based on combo size or chain level
+    generateGarbage(matchSize, chainLevel) {
+        let garbageConfigs = [];
+        
+        // Generate garbage based on combo size (match size)
+        if (matchSize >= 4 && chainLevel === 0) {
+            // Rules for combos
+            switch(matchSize) {
+                case 4: // 3-wide block
+                    garbageConfigs.push({ width: 3, height: 1 });
+                    break;
+                case 5: // 4-wide block
+                    garbageConfigs.push({ width: 4, height: 1 });
+                    break;
+                case 6: // 5-wide block
+                    garbageConfigs.push({ width: 5, height: 1 });
+                    break;
+                case 7: // 6-wide block (same as 2x chain)
+                    garbageConfigs.push({ width: 6, height: 1 });
+                    break;
+                case 8: // Two blocks, 3-wide and 4-wide
+                    garbageConfigs.push({ width: 3, height: 1 });
+                    garbageConfigs.push({ width: 4, height: 1 });
+                    break;
+                case 9: // Two 4-wide blocks
+                    garbageConfigs.push({ width: 4, height: 1 });
+                    garbageConfigs.push({ width: 4, height: 1 });
+                    break;
+                default: // 10+ combos, two 6-wide blocks
+                    if (matchSize >= 10) {
+                        garbageConfigs.push({ width: 6, height: 1 });
+                        garbageConfigs.push({ width: 6, height: 1 });
+                    }
+                    break;
+            }
+        } 
+        // Generate garbage based on chain level
+        else if (chainLevel > 0) {
+            // Rules for chains
+            switch(chainLevel) {
+                case 1: // 1x chain - now generates a 2-wide × 2-tall block
+                    garbageConfigs.push({ width: 2, height: 2 });
+                    break;
+                case 2: // 2x chain - 6-wide block
+                    garbageConfigs.push({ width: 6, height: 1 });
+                    break;
+                case 3: // 3x chain - 2-tall block
+                    garbageConfigs.push({ width: GRID_X, height: 2 });
+                    break;
+                case 4: // 4x chain - 3-tall block
+                    garbageConfigs.push({ width: GRID_X, height: 3 });
+                    break;
+                default: // 5+ chain - 4-tall block
+                    if (chainLevel >= 5) {
+                        garbageConfigs.push({ width: GRID_X, height: 4 });
+                    }
+                    break;
+            }
+        }
+        
+        return garbageConfigs;
+    }
 
     setupEventListeners() {
         // Keyboard controls for player
@@ -527,8 +601,12 @@ class VersusGame {
         const isBlock2Locked = block2 && typeof block2 === 'object' && 
             (block2.state === 'matching' || block2.state === 'popping' || block2.state === 'falling');
         
-        // Don't allow swapping if either block is locked or if any blocks are falling
-        if (isBlock1Locked || isBlock2Locked || gameState.fallingBlocks.size > 0) {
+        // Check if either position is inside a garbage block
+        const isPos1Garbage = this.isPositionInsideGarbage(gameState, x1, y);
+        const isPos2Garbage = this.isPositionInsideGarbage(gameState, x2, y);
+        
+        // Don't allow swapping if either block is locked, any blocks are falling, or positions overlap with garbage
+        if (isBlock1Locked || isBlock2Locked || isPos1Garbage || isPos2Garbage || gameState.fallingBlocks.size > 0) {
             return;
         }
         
@@ -657,9 +735,38 @@ class VersusGame {
         });
     }
 
+    addMatchCountPopup(gameState, x, y, matchCount) {
+        // Only show for matches of 4 or more
+        if (matchCount < 4) return;
+        
+        // Calculate screen position (center of the matched blocks)
+        const screenX = GRID_PADDING + (x * (BLOCK_SIZE + GAP)) + BLOCK_SIZE/2;
+        const screenY = GRID_PADDING + (y * (BLOCK_SIZE + GAP)) + BLOCK_SIZE/2;
+        
+        // Add to the appropriate game state's matchCountPopups array
+        if (!gameState.matchCountPopups) {
+            gameState.matchCountPopups = [];
+        }
+        
+        gameState.matchCountPopups.push({
+            count: matchCount,
+            x: screenX,
+            y: screenY,
+            startTime: performance.now(),
+            duration: 1500, // Longer duration for the full animation
+            opacity: 1
+        });
+    }
+
     checkMatches(gameState) {
         const matches = this.findMatches(gameState);
         if (matches.length > 0) {
+            // First check if any of these matches should clear garbage blocks
+            if (gameState.garbageBlocks.length > 0) {
+                this.checkGarbageClearing(gameState, matches);
+            }
+            
+            // Then remove the matches normally
             this.removeMatches(gameState, matches);
         } else {
             gameState.isSwapping = false;
@@ -681,20 +788,19 @@ class VersusGame {
             clearTimeout(gameState.chainTimer);
         }
 
+        // Determine if this is an AI match
+        const isAiMatch = gameState === this.aiState;
+
         // Play match size sound effect
-        audioManager.playMatchSound(matches.length);
+        audioManager.playMatchSound(matches.length, isAiMatch);
 
         // Increment chain counter if this is part of a chain
         if (isChain) {
             gameState.chainCounter++;
             
             // Play chain sound based on chain level
-            if (gameState.chainCounter === 1) {
-                audioManager.playSound('chain1');
-            } else if (gameState.chainCounter === 2) {
-                audioManager.playSound('chain2');
-            } else if (gameState.chainCounter >= 3) {
-                audioManager.playSound('chain3');
+            if (gameState.chainCounter >= 1) {
+                audioManager.playChainSound(gameState.chainCounter, isAiMatch);
             }
             
             // Activate chain display
@@ -716,6 +822,11 @@ class VersusGame {
         const centerMatch = matches[Math.floor(matches.length / 2)];
         this.addFloatingScore(gameState, centerMatch.x, centerMatch.y, baseScore, gameState.chainCounter);
         
+        // Add match count popup for matches of 4 or more
+        if (matches.length >= 4) {
+            this.addMatchCountPopup(gameState, centerMatch.x, centerMatch.y, matches.length);
+        }
+        
         // Update score
         gameState.score += matchScore;
         
@@ -724,6 +835,38 @@ class VersusGame {
             document.getElementById('playerScoreValue').textContent = gameState.score;
         } else {
             document.getElementById('aiScoreValue').textContent = gameState.score;
+        }
+
+        // Check if any matches are adjacent to garbage blocks
+        if (gameState.garbageBlocks.length > 0) {
+            this.checkGarbageClearing(gameState, matches);
+        }
+
+        // Generate garbage blocks and send to opponent
+        // Generate garbage blocks and send to opponent
+        if (matches.length >= 4 || (isChain && gameState.chainCounter >= 1)) {
+            // Get the opponent's state
+            const opponentState = gameState === this.playerState ? this.aiState : this.playerState;
+            
+            // Generate garbage based on match size or chain level
+            const garbageConfigs = this.generateGarbage(matches.length, isChain ? gameState.chainCounter : 0);
+            
+            // Add garbage to opponent's pending queue if there are valid configs
+            if (garbageConfigs.length > 0) {
+                // Add garbage indicator effect
+                this.showGarbageIndicator(opponentState, garbageConfigs);
+                
+                // Add to opponent's pending garbage with a slight delay
+                setTimeout(() => {
+                    garbageConfigs.forEach(config => {
+                        opponentState.pendingGarbage.push({
+                            ...config,
+                            state: 'pending',
+                            createdAt: performance.now()
+                        });
+                    });
+                }, 1000); // Delay before garbage appears
+            }
         }
 
         // First phase: Flash the blocks (800ms)
@@ -749,7 +892,9 @@ class VersusGame {
                             state: 'popping',
                             animationStart: performance.now()
                         };
-                        audioManager.playPopSound();
+                        // Determine if this is an AI pop
+                        const isAiPop = gameState === this.aiState;
+                        audioManager.playPopSound(isAiPop);
                     }
                 }, index * 200);
                 
@@ -786,8 +931,19 @@ class VersusGame {
                     let fallDistance = 1;
                     let targetY = y + 1;
                     
+                    // Check initial position - if there's a garbage block here already, this block can't fall
+                    let positionBlockedByGarbage = this.isPositionInsideGarbage(gameState, x, targetY);
+                    if (positionBlockedByGarbage) {
+                        continue; // Can't fall
+                    }
+                    
                     // Find how far it can fall
                     while (targetY + 1 < GRID_Y && !gameState.grid[targetY + 1][x]) {
+                        // Before increasing the fall distance, check if there's a garbage block in the way
+                        if (this.isPositionInsideGarbage(gameState, x, targetY + 1)) {
+                            break; // Stop at this position, can't fall further
+                        }
+                        
                         fallDistance++;
                         targetY++;
                     }
@@ -811,6 +967,10 @@ class VersusGame {
             }
         }
         
+        // Check if garbage blocks should fall too
+        const garbageFell = this.dropGarbageBlocks(gameState);
+        blocksFell = blocksFell || garbageFell;
+        
         if (!blocksFell) {
             // If no blocks fell, check for matches
             const newMatches = this.findMatches(gameState);
@@ -826,6 +986,9 @@ class VersusGame {
     }
     
     updateFallingBlocks(gameState, currentTime) {
+        // Skip updating falling blocks if there are any angry blocks
+        if (this.hasAngryBlocks(gameState)) return;
+        
         if (gameState.fallingBlocks.size === 0) return;
         
         let allBlocksLanded = true;
@@ -992,61 +1155,89 @@ class VersusGame {
                     ctx.fill();
                 }
             }
+        } else if (blockState === 'angry') {
+            const progress = (currentTime - block.animationStart) / 300;
+            
+            // Add subtle shaking animation
+            const shakeIntensity = 2;
+            const shakeX = Math.sin(progress * Math.PI * 6) * shakeIntensity;
+            const shakeY = Math.cos(progress * Math.PI * 5) * shakeIntensity;
+            
+            // Apply the shake
+            ctx.translate(shakeX, shakeY);
+            
+            // Add glow effect
+            ctx.shadowColor = 'rgba(255, 0, 0, 0.8)';
+            ctx.shadowBlur = 8;
+            
+            // If the block has an angriness value, apply it
+            if (block.angriness !== undefined) {
+                // Darker fill for angry blocks
+                const color = this.getBlockColor(blockType, isAiBlock);
+                ctx.fillStyle = this.adjustColorBrightness(color, -20); // Make color darker
+            }
         }
         
         ctx.beginPath();
         ctx.roundRect(xPos, yPos, BLOCK_SIZE, BLOCK_SIZE, 8);
         ctx.fill();
         
-        // Choose the appropriate symbol based on whether it's an AI block or player block
-        const symbol = this.getBlockSymbol(blockType, isAiBlock);
-        if (symbol) {
+        // Draw the appropriate symbol based on the block type and state
+        if (blockState === 'angry') {
+            // For angry blocks, draw an angry face emoji
             ctx.font = '30px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'white';
             
-            if (blockState === 'matching') {
-                const progress = (currentTime - block.animationStart) / 300;
+            // Apply subtle shake to the emoji too
+            const progress = (currentTime - block.animationStart) / 300;
+            const shakeIntensity = 1;
+            const shakeX = Math.sin(progress * Math.PI * 6) * shakeIntensity;
+            const shakeY = Math.cos(progress * Math.PI * 5) * shakeIntensity;
+            
+            // Draw angry face
+            ctx.fillText('😠', centerX + shakeX, centerY + shakeY);
+        } else {
+            // Choose the appropriate symbol based on whether it's an AI block or player block
+            const symbol = this.getBlockSymbol(blockType, isAiBlock);
+            if (symbol) {
+                ctx.font = '30px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
                 
-                // Gentle floating motion
-                const floatY = Math.sin(progress * Math.PI * 4) * 2;
-                
-                // Add soft white glow to the symbol
-                ctx.shadowColor = 'white';
-                ctx.shadowBlur = 8;
-                ctx.fillStyle = 'white';
-                ctx.fillText(symbol, centerX, centerY + floatY);
-            } else if (blockState === 'popping') {
-                const progress = (currentTime - block.animationStart) / 300;
-                
-                // Enhanced symbol animation for popping
-                const symbolScale = 1.2 - progress * 0.5;
-                const symbolOpacity = 1 - progress * 1.5; // Fade out faster than block
-                
-                if (symbolOpacity > 0) {
-                    // Add vibrant glow to the symbol
+                if (blockState === 'matching') {
+                    const progress = (currentTime - block.animationStart) / 300;
+                    
+                    // Gentle floating motion
+                    const floatY = Math.sin(progress * Math.PI * 4) * 2;
+                    
+                    // Add soft white glow to the symbol
                     ctx.shadowColor = 'white';
-                    ctx.shadowBlur = 12 * (1 - progress);
-                    ctx.fillStyle = `rgba(255, 255, 255, ${symbolOpacity})`;
+                    ctx.shadowBlur = 8;
+                    ctx.fillStyle = 'white';
+                    ctx.fillText(symbol, centerX, centerY + floatY);
+                } else if (blockState === 'popping') {
+                    const progress = (currentTime - block.animationStart) / 300;
                     
-                    // Scale and drift the symbol upward slightly
-                    const driftY = -progress * 10;
-                    
-                    ctx.font = `${30 * symbolScale}px Arial`;
-                    ctx.fillText(symbol, centerX, centerY + driftY);
+                    // Fade and float up
+                    const floatY = -progress * 8;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${1 - progress})`;
+                    ctx.fillText(symbol, centerX, centerY + floatY);
+                } else {
+                    // Normal symbol with shadow
+                    ctx.fillStyle = 'white';
+                    // Add shadow for normal symbols (matching game.js style)
+                    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+                    ctx.shadowBlur = 4;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 2;
+                    ctx.fillText(symbol, centerX, centerY);
                 }
-            } else {
-                // Normal emoji rendering
-                ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                ctx.shadowBlur = 4;
-                ctx.shadowOffsetX = 2;
-                ctx.shadowOffsetY = 2;
-                ctx.fillStyle = 'white';
-                ctx.fillText(symbol, centerX, centerY);
             }
         }
         
-        // Restore the context to its original state
+        // Restore the context to avoid affecting other drawing operations
         ctx.restore();
     }
     
@@ -1165,6 +1356,121 @@ class VersusGame {
         });
     }
 
+    drawMatchCountPopups(ctx, gameState, currentTime) {
+        if (!gameState.matchCountPopups) return;
+        
+        gameState.matchCountPopups = gameState.matchCountPopups.filter(popup => {
+            const progress = (currentTime - popup.startTime) / popup.duration;
+            if (progress >= 1) return false;
+            
+            ctx.save();
+            
+            // Animation phases:
+            // 1. Appear and grow (0-20%)
+            // 2. Spin around once (20-60%)
+            // 3. Evaporate/dissolve (60-100%)
+            
+            // Calculate scale based on phase
+            let scale;
+            if (progress < 0.2) {
+                // Phase 1: Grow from 0.5 to 1.2 (slight overshoot)
+                scale = 0.5 + (progress / 0.2) * 0.7;
+            } else if (progress < 0.6) {
+                // Phase 2: Maintain slightly larger scale during spin
+                scale = 1.2;
+            } else {
+                // Phase 3: Grow larger while fading out
+                scale = 1.2 + ((progress - 0.6) / 0.4) * 0.8;
+            }
+            
+            // Calculate rotation based on phase
+            let rotation = 0;
+            if (progress >= 0.2 && progress < 0.6) {
+                // Complete one full rotation during phase 2
+                rotation = ((progress - 0.2) / 0.4) * Math.PI * 2;
+            }
+            
+            // Calculate opacity based on phase
+            let opacity;
+            if (progress < 0.2) {
+                // Phase 1: Fade in
+                opacity = progress / 0.2;
+            } else if (progress < 0.6) {
+                // Phase 2: Full opacity
+                opacity = 1;
+            } else {
+                // Phase 3: Fade out
+                opacity = 1 - ((progress - 0.6) / 0.4);
+            }
+            
+            // Apply transformations
+            ctx.translate(popup.x, popup.y);
+            ctx.rotate(rotation);
+            ctx.scale(scale, scale);
+            
+            // Determine color based on match count
+            let color;
+            if (popup.count >= 6) {
+                color = `rgba(255,50,50,${opacity})`; // Red for 6+
+            } else if (popup.count >= 5) {
+                color = `rgba(255,165,0,${opacity})`; // Orange for 5
+            } else {
+                color = `rgba(50,50,255,${opacity})`; // Blue for 4
+            }
+            
+            // Draw box background
+            const boxWidth = 40;
+            const boxHeight = 40;
+            
+            // Add glow effect
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 10;
+            
+            // Draw rounded rectangle box
+            ctx.fillStyle = `rgba(0,0,0,${opacity * 0.7})`;
+            ctx.beginPath();
+            ctx.roundRect(-boxWidth/2, -boxHeight/2, boxWidth, boxHeight, 8);
+            ctx.fill();
+            
+            // Add border
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw number
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = 'bold 24px "Press Start 2P"';
+            
+            // Draw text
+            ctx.fillStyle = color;
+            ctx.fillText(`${popup.count}`, 0, 0);
+            
+            // Phase 3: Add particles for evaporation effect
+            if (progress >= 0.6) {
+                const particleCount = 8;
+                const evaporateProgress = (progress - 0.6) / 0.4;
+                const particleDistance = evaporateProgress * 30;
+                
+                for (let i = 0; i < particleCount; i++) {
+                    const angle = (i / particleCount) * Math.PI * 2;
+                    const particleX = Math.cos(angle) * particleDistance;
+                    const particleY = Math.sin(angle) * particleDistance;
+                    const particleSize = 4 * (1 - evaporateProgress);
+                    const particleOpacity = opacity * (1 - evaporateProgress);
+                    
+                    ctx.fillStyle = `rgba(255,255,255,${particleOpacity})`;
+                    ctx.beginPath();
+                    ctx.arc(particleX, particleY, particleSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            ctx.restore();
+            return true;
+        });
+    }
+
     drawChainIndicator(ctx, gameState, currentTime) {
         if (!gameState.chainDisplay.active) return;
         
@@ -1271,6 +1577,20 @@ class VersusGame {
             gameState.cursorY--;
         }
         
+        // Move all garbage blocks up
+        for (const garbage of gameState.garbageBlocks) {
+            // Only move non-falling garbage blocks
+            if (garbage.state !== 'falling') {
+                garbage.y--;
+                
+                // If a garbage block moves into a negative position, it's game over
+                if (garbage.y < 0) {
+                    // Check if this will cause blocks to go above the top of the grid
+                    this.checkDangerState(gameState);
+                }
+            }
+        }
+        
         // Check for matches after shifting
         this.checkMatches(gameState);
     }
@@ -1291,7 +1611,15 @@ class VersusGame {
         // Check top row for blocks
         const hasBlocksAtTop = gameState.grid[0].some(block => block !== null);
         
-        if (hasBlocksAtTop && !gameState.dangerState.active) {
+        // Check for garbage blocks at the top row, but ONLY include settled ones (not falling)
+        const hasGarbageAtTop = gameState.garbageBlocks.some(garbage => 
+            garbage.y <= 0 && garbage.state !== 'falling'
+        );
+        
+        // Player is in danger if either blocks or settled garbage are at the top
+        const inDanger = hasBlocksAtTop || hasGarbageAtTop;
+        
+        if (inDanger && !gameState.dangerState.active) {
             // Store the current rising speed before stopping
             const currentSpeed = gameState.risingState.speed;
             
@@ -1304,7 +1632,7 @@ class VersusGame {
                 isFinalWarning: true,
                 previousSpeed: currentSpeed // Store the speed to resume at
             };
-        } else if (hasBlocksAtTop && gameState.dangerState.active && gameState.dangerState.isFinalWarning) {
+        } else if (inDanger && gameState.dangerState.active && gameState.dangerState.isFinalWarning) {
             // Check if time's up during final warning
             const timeInDanger = performance.now() - gameState.dangerState.startTime;
             if (timeInDanger >= gameState.dangerState.warningDuration) {
@@ -1313,7 +1641,7 @@ class VersusGame {
                 // If player is game over, AI wins
                 if (gameState === this.playerState && !this.aiState.gameOver) {
                     this.showGameOver('ai');
-                } 
+                }
                 // If AI is game over, player wins
                 else if (gameState === this.aiState && !this.playerState.gameOver) {
                     this.showGameOver('player');
@@ -1323,7 +1651,7 @@ class VersusGame {
                     this.showGameOver('draw');
                 }
             }
-        } else if (!hasBlocksAtTop && gameState.dangerState.active && gameState.dangerState.isFinalWarning) {
+        } else if (!inDanger && gameState.dangerState.active && gameState.dangerState.isFinalWarning) {
             // Player cleared the top row in time
             gameState.dangerState.active = false;
             // Resume at the previous speed instead of fixed value
@@ -1351,6 +1679,12 @@ class VersusGame {
             // Update falling blocks
             this.updateFallingBlocks(this.playerState, currentTime);
             
+            // Update falling garbage blocks
+            this.updateFallingGarbage(this.playerState, currentTime);
+            
+            // Process pending garbage for player
+            this.processGarbage(this.playerState, currentTime);
+            
             // Only update rising if no blocks are falling
             if (this.playerState.fallingBlocks.size === 0) {
                 this.updateRising(this.playerState, currentTime);
@@ -1364,6 +1698,12 @@ class VersusGame {
         if (!this.playerState.gameOver && !this.aiState.gameOver) {
             // Update falling blocks
             this.updateFallingBlocks(this.aiState, currentTime);
+            
+            // Update falling garbage blocks
+            this.updateFallingGarbage(this.aiState, currentTime);
+            
+            // Process pending garbage for AI
+            this.processGarbage(this.aiState, currentTime);
             
             // Only update rising if no blocks are falling
             if (this.aiState.fallingBlocks.size === 0) {
@@ -1413,9 +1753,16 @@ class VersusGame {
             }
         }
         
+        // Draw player garbage blocks
+        for (const garbageBlock of this.playerState.garbageBlocks) {
+            this.drawGarbageBlock(this.playerCtx, garbageBlock, this.playerState);
+        }
+        
         this.drawPreviewRow(this.playerCtx, this.playerState);
         this.drawFloatingScores(this.playerCtx, this.playerState, currentTime);
+        this.drawMatchCountPopups(this.playerCtx, this.playerState, currentTime);
         this.drawChainIndicator(this.playerCtx, this.playerState, currentTime);
+        this.drawGarbageIndicator(this.playerCtx, this.playerState);
         this.drawCursor(this.playerCtx, this.playerState);
         
         this.playerCtx.restore();
@@ -1437,9 +1784,16 @@ class VersusGame {
             }
         }
         
+        // Draw AI garbage blocks
+        for (const garbageBlock of this.aiState.garbageBlocks) {
+            this.drawGarbageBlock(this.aiCtx, garbageBlock, this.aiState);
+        }
+        
         this.drawPreviewRow(this.aiCtx, this.aiState);
         this.drawFloatingScores(this.aiCtx, this.aiState, currentTime);
+        this.drawMatchCountPopups(this.aiCtx, this.aiState, currentTime);
         this.drawChainIndicator(this.aiCtx, this.aiState, currentTime);
+        this.drawGarbageIndicator(this.aiCtx, this.aiState);
         this.drawCursor(this.aiCtx, this.aiState);
         
         this.aiCtx.restore();
@@ -1497,6 +1851,7 @@ class VersusGame {
             chainCounter: 0,
             chainTimer: null,
             floatingScores: [],
+            matchCountPopups: [],
             fallingFromChain: false,
             chainDisplay: {
                 active: false,
@@ -1527,7 +1882,10 @@ class VersusGame {
                 speed: this.calculateRisingSpeed(savedSpeed),
                 nextRow: [],
                 previewRow: []
-            }
+            },
+            // Garbage block tracking
+            garbageBlocks: [],
+            pendingGarbage: []
         };
         
         // Reset AI state
@@ -1543,6 +1901,7 @@ class VersusGame {
             chainCounter: 0,
             chainTimer: null,
             floatingScores: [],
+            matchCountPopups: [],
             fallingFromChain: false,
             chainDisplay: {
                 active: false,
@@ -1571,7 +1930,10 @@ class VersusGame {
                 speed: this.calculateRisingSpeed(savedSpeed),
                 nextRow: [],
                 previewRow: []
-            }
+            },
+            // Garbage block tracking
+            garbageBlocks: [],
+            pendingGarbage: []
         };
         
         // Reinitialize AI
@@ -1782,6 +2144,9 @@ class VersusGame {
     }
     
     updateTheme(theme) {
+        // Store the current theme name
+        this.currentTheme = theme;
+        
         // For player blocks, use the selected theme
         this.playerBlockSymbols = this.themeSymbols[theme];
         this.playerBlockColors = this.themeColors[theme];
@@ -1893,9 +2258,924 @@ class VersusGame {
         // Restore context state
         this.bgCtx.restore();
     }
+
+    // Show visual indicator that garbage is coming for a player
+    showGarbageIndicator(targetState, garbageConfigs) {
+        // Calculate total width and height of incoming garbage
+        let totalWidth = 0;
+        let totalHeight = 0;
+        
+        garbageConfigs.forEach(config => {
+            totalWidth += config.width;
+            totalHeight += config.height;
+        });
+        
+        // Create garbage indicator
+        targetState.garbageIndicator = {
+            active: true,
+            startTime: performance.now(),
+            duration: 1000, // 1 second indicator
+            configs: garbageConfigs,
+            totalWidth,
+            totalHeight
+        };
+    }
+
+    drawGarbageIndicator(ctx, gameState) {
+        if (!gameState.garbageIndicator || !gameState.garbageIndicator.active) return;
+        
+        const currentTime = performance.now();
+        const progress = (currentTime - gameState.garbageIndicator.startTime) / gameState.garbageIndicator.duration;
+        
+        if (progress >= 1) {
+            gameState.garbageIndicator.active = false;
+            return;
+        }
+        
+        // Design: Red warning at the top of the play area indicating incoming garbage
+        ctx.save();
+        
+        // Flashing animation
+        const opacity = 0.5 + Math.sin(progress * Math.PI * 6) * 0.4;
+        
+        // Draw red warning band at top
+        ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
+        ctx.fillRect(0, 0, this.baseWidth, 20);
+        
+        // Draw info about incoming garbage
+        const totalConfigs = gameState.garbageIndicator.configs.length;
+        const totalWidthText = gameState.garbageIndicator.totalWidth;
+        const totalHeightText = gameState.garbageIndicator.totalHeight;
+        
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillStyle = 'white';
+        
+        // Text warning
+        if (totalHeightText > 1) {
+            // For taller blocks
+            ctx.fillText(`⚠️ ${totalHeightText} ROW GARBAGE! ⚠️`, this.baseWidth / 2, 10);
+        } else {
+            // For wider blocks
+            const blockText = totalConfigs > 1 ? `${totalConfigs} BLOCKS` : `${totalWidthText}-WIDE`;
+            ctx.fillText(`⚠️ ${blockText} ⚠️`, this.baseWidth / 2, 10);
+        }
+        
+        ctx.restore();
+    }
+    
+    // Process and drop pending garbage blocks onto the grid
+    processGarbage(gameState, currentTime) {
+        // Return if no pending garbage
+        if (gameState.pendingGarbage.length === 0) return;
+        
+        // Don't drop garbage if blocks are falling or if there are active matches
+        if (gameState.fallingBlocks.size > 0) return;
+        
+        // Don't drop garbage if another garbage block is already falling
+        const hasFallingGarbage = gameState.garbageBlocks.some(garbage => garbage.state === 'falling');
+        if (hasFallingGarbage) return;
+        
+        // Check for any blocks in matching or popping state
+        const hasActiveMatches = gameState.grid.some(row => 
+            row.some(block => 
+                block && 
+                typeof block === 'object' && 
+                (block.state === 'matching' || block.state === 'popping')
+            )
+        );
+        
+        if (hasActiveMatches) return;
+        
+        // Get the first garbage block from the queue
+        const garbageBlock = gameState.pendingGarbage.shift();
+        
+        // Try different starting positions to avoid overlapping with existing garbage blocks
+        const possibleStartPositions = [];
+        
+        if (garbageBlock.width < GRID_X) {
+            // Calculate all possible starting positions
+            const maxStart = GRID_X - garbageBlock.width;
+            for (let startX = 0; startX <= maxStart; startX++) {
+                // Check if this position would overlap with any existing garbage block
+                let overlapsExisting = false;
+                
+                // Check each existing garbage block
+                for (const existingGarbage of gameState.garbageBlocks) {
+                    // Check for horizontal overlap
+                    const horizontalOverlap = !(
+                        startX + garbageBlock.width <= existingGarbage.x ||
+                        startX >= existingGarbage.x + existingGarbage.width
+                    );
+                    
+                    if (horizontalOverlap) {
+                        overlapsExisting = true;
+                        break;
+                    }
+                }
+                
+                if (!overlapsExisting) {
+                    possibleStartPositions.push(startX);
+                }
+            }
+        }
+        
+        // Choose a starting position
+        let startX = 0;
+        if (possibleStartPositions.length > 0) {
+            // If we have non-overlapping positions, choose one randomly
+            const randomIndex = Math.floor(Math.random() * possibleStartPositions.length);
+            startX = possibleStartPositions[randomIndex];
+        } else if (garbageBlock.width < GRID_X) {
+            // If all positions overlap, just choose a random position
+            const maxStart = GRID_X - garbageBlock.width;
+            startX = Math.floor(Math.random() * (maxStart + 1));
+        }
+        
+        // Find the target Y position (where the garbage will land)
+        let targetY = GRID_Y - garbageBlock.height; // Default to bottom
+        
+        // First check for collision with existing blocks in the grid
+        let foundCollision = false;
+        let collisionY = GRID_Y;
+        
+        // Check for collisions with grid blocks
+        for (let y = 0; y < GRID_Y; y++) {
+            let rowHasBlock = false;
+            for (let x = startX; x < startX + garbageBlock.width; x++) {
+                if (gameState.grid[y][x]) {
+                    rowHasBlock = true;
+                    foundCollision = true;
+                    collisionY = Math.min(collisionY, y);
+                    break;
+                }
+            }
+            if (rowHasBlock) break;
+        }
+        
+        // Also check for collisions with other garbage blocks
+        for (const otherGarbage of gameState.garbageBlocks) {
+            if (otherGarbage.state === 'falling') continue; // Skip other falling garbage
+            
+            // Check if horizontal positions overlap
+            const horizontalOverlap = !(
+                startX + garbageBlock.width <= otherGarbage.x || 
+                startX >= otherGarbage.x + otherGarbage.width
+            );
+            
+            if (horizontalOverlap) {
+                // Calculate the top position of this garbage block
+                const otherGarbageTop = otherGarbage.y;
+                
+                if (otherGarbageTop < collisionY) {
+                    collisionY = otherGarbageTop;
+                    foundCollision = true;
+                }
+            }
+        }
+        
+        // Set the target Y based on collision detection
+        if (foundCollision) {
+            targetY = Math.max(0, collisionY - garbageBlock.height);
+        }
+        
+        // Create the garbage block
+        const newGarbage = {
+            ...garbageBlock,
+            x: startX,
+            y: 0, // Start at the top
+            state: 'falling',
+            fallStart: currentTime,
+            targetY: targetY, // Where it will land
+            currentY: 0,
+            clearProgress: 0,
+            // Store the element type index instead of a fixed color
+            colorIndex: Math.floor(Math.random() * 5) // 5 = number of elements in each theme
+        };
+        
+        // Add the garbage block to the game state
+        gameState.garbageBlocks.push(newGarbage);
+        
+        // Play garbage sound effect
+        if (audioManager) {
+            audioManager.playSound('garbageDrop');
+        }
+        
+        console.log("Garbage block added to", gameState === this.aiState ? "AI" : "Player");
+    }
+    
+    // Shift the grid up to make room for garbage
+    shiftGridUpForGarbage(gameState, garbageHeight) {
+        // Move everything up by garbage height
+        for (let y = garbageHeight; y < GRID_Y; y++) {
+            for (let x = 0; x < GRID_X; x++) {
+                // Move blocks up
+                gameState.grid[y - garbageHeight][x] = gameState.grid[y][x];
+            }
+        }
+        
+        // Clear the bottom rows where garbage will be placed
+        for (let y = GRID_Y - garbageHeight; y < GRID_Y; y++) {
+            for (let x = 0; x < GRID_X; x++) {
+                gameState.grid[y][x] = null;
+            }
+        }
+        
+        // Move cursor up by garbage height (with bounds checking)
+        gameState.cursorY = Math.max(0, gameState.cursorY - garbageHeight);
+        
+        // Check danger state immediately after shifting
+        this.checkDangerState(gameState);
+    }
+    
+    // Draw a garbage block on the grid
+    drawGarbageBlock(ctx, garbageBlock, gameState) {
+        try {
+            ctx.save();
+            
+            // Calculate position
+            const xPos = GRID_PADDING + (garbageBlock.x * (BLOCK_SIZE + GAP));
+            
+            // Use currentY for animation if the block is falling
+            let yPosition = garbageBlock.y;
+            if (garbageBlock.state === 'falling' && typeof garbageBlock.currentY !== 'undefined') {
+                yPosition = garbageBlock.currentY;
+            }
+            
+            const yPos = GRID_PADDING + ((yPosition - gameState.risingState.offset) * (BLOCK_SIZE + GAP));
+            
+            // Calculate garbage size
+            const width = (garbageBlock.width * BLOCK_SIZE) + ((garbageBlock.width - 1) * GAP);
+            const height = (garbageBlock.height * BLOCK_SIZE) + ((garbageBlock.height - 1) * GAP);
+            
+            // Check for danger state animation
+            const currentTime = performance.now();
+            
+            // Only apply danger state if the garbage is settled (not falling)
+            // AND if it's in the danger zone (top 3 rows) or if there's a final warning
+            if (gameState.dangerState.active && garbageBlock.state !== 'falling') {
+                if (gameState.dangerState.isFinalWarning) {
+                    // Final warning - affect ALL blocks with pulsing effect
+                    const dangerProgress = (currentTime - gameState.dangerState.startTime) / 300; // 300ms per pulse
+                    const dangerPulse = Math.sin(dangerProgress * Math.PI * 2) * 0.3 + 0.7;
+                    
+                    ctx.shadowColor = 'red';
+                    ctx.shadowBlur = 20;
+                    ctx.globalAlpha *= dangerPulse;
+                } else if (yPosition < 3) {
+                    // Normal danger state for top 3 rows
+                    const dangerProgress = (currentTime - gameState.dangerState.startTime) / 300;
+                    const dangerPulse = Math.sin(dangerProgress * Math.PI * 2) * 0.3 + 0.7;
+                    
+                    ctx.shadowColor = 'red';
+                    ctx.shadowBlur = 20;
+                    ctx.globalAlpha *= dangerPulse;
+                }
+            }
+            
+            // Get the color from the current theme using colorIndex
+            let fillColor = 'rgba(150, 150, 150, 0.9)'; // Default fallback
+            
+            if (typeof garbageBlock.colorIndex === 'number') {
+                // Get the colors from the current theme
+                const isAiBlock = gameState === this.aiState;
+                const themeColors = isAiBlock ? this.aiThemeColors : this.themeColors[this.currentTheme];
+                
+                if (themeColors) {
+                    // Get all color values from the theme
+                    const colorValues = Object.values(themeColors);
+                    
+                    // Use the colorIndex to select a specific color (with modulo for safety)
+                    if (colorValues.length > 0) {
+                        const index = garbageBlock.colorIndex % colorValues.length;
+                        fillColor = colorValues[index];
+                    }
+                }
+            } else if (garbageBlock.color) {
+                // For backwards compatibility with existing garbage blocks
+                fillColor = garbageBlock.color;
+            }
+            
+            // Draw the garbage block
+            ctx.fillStyle = fillColor;
+            ctx.beginPath();
+            ctx.roundRect(xPos, yPos, width, height, 4);
+            ctx.fill();
+            
+            // Add a border - use default color for safety
+            ctx.strokeStyle = 'rgba(100, 100, 100, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Add a simple grid pattern
+            ctx.strokeStyle = 'rgba(80, 80, 80, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            
+            // Draw vertical grid lines
+            for (let x = 1; x < garbageBlock.width; x++) {
+                const lineX = xPos + (x * (BLOCK_SIZE + GAP));
+                ctx.moveTo(lineX, yPos);
+                ctx.lineTo(lineX, yPos + height);
+            }
+            
+            // Draw horizontal grid lines
+            for (let y = 1; y < garbageBlock.height; y++) {
+                const lineY = yPos + (y * (BLOCK_SIZE + GAP));
+                ctx.moveTo(xPos, lineY);
+                ctx.lineTo(xPos + width, lineY);
+            }
+            ctx.stroke();
+            
+            ctx.restore();
+        } catch (error) {
+            console.error("Error drawing garbage block:", error);
+            // Restore the context to prevent state issues
+            try { ctx.restore(); } catch {}
+        }
+    }
+    
+    // Helper method to adjust the brightness of a hex color
+    adjustColorBrightness(hex, percent) {
+        try {
+            // Check if the hex string is valid
+            if (!hex || typeof hex !== 'string' || !hex.startsWith('#') || hex.length !== 7) {
+                return 'rgba(100, 100, 100, 0.8)'; // Return default if invalid
+            }
+            
+            // Convert hex to RGB
+            let r = parseInt(hex.slice(1, 3), 16);
+            let g = parseInt(hex.slice(3, 5), 16);
+            let b = parseInt(hex.slice(5, 7), 16);
+            
+            // Check if values are valid
+            if (isNaN(r) || isNaN(g) || isNaN(b)) {
+                return 'rgba(100, 100, 100, 0.8)'; // Return default if parse failed
+            }
+
+            // Adjust brightness
+            r = Math.max(0, Math.min(255, r + percent));
+            g = Math.max(0, Math.min(255, g + percent));
+            b = Math.max(0, Math.min(255, b + percent));
+
+            // Convert back to hex with proper formatting
+            const rHex = Math.round(r).toString(16).padStart(2, '0');
+            const gHex = Math.round(g).toString(16).padStart(2, '0');
+            const bHex = Math.round(b).toString(16).padStart(2, '0');
+            
+            return `#${rHex}${gHex}${bHex}`;
+        } catch (error) {
+            console.error("Error adjusting color brightness:", error);
+            return 'rgba(100, 100, 100, 0.8)'; // Return default if any error occurs
+        }
+    }
+    
+    // Returns a random color from the current theme
+    getRandomThemeColor(isAiBlock) {
+        try {
+            // Default theme if none is set
+            if (!this.currentTheme) {
+                this.currentTheme = 'theme-elements';
+            }
+            
+            // Determine which theme colors to use based on if it's an AI block
+            const colors = isAiBlock ? this.aiThemeColors : this.themeColors[this.currentTheme];
+            
+            // Make sure we have valid colors
+            if (!colors) {
+                // Return a default color if theme colors are not available
+                return 'rgba(150, 150, 150, 0.9)';
+            }
+            
+            // Get all color values from the theme
+            const colorValues = Object.values(colors);
+            
+            if (colorValues.length === 0) {
+                return 'rgba(150, 150, 150, 0.9)';
+            }
+            
+            // Return a random color from the available colors
+            return colorValues[Math.floor(Math.random() * colorValues.length)];
+        } catch (error) {
+            console.error("Error getting random theme color:", error);
+            return 'rgba(150, 150, 150, 0.9)';
+        }
+    }
+    
+    // Handle garbage block clearing when matches occur adjacent to it
+    checkGarbageClearing(gameState, matches) {
+        if (gameState.garbageBlocks.length === 0 || matches.length === 0) return;
+        
+        // Track which garbage blocks have been affected
+        const affectedGarbage = new Set();
+        
+        // Check each match against each garbage block
+        for (const match of matches) {
+            for (let i = 0; i < gameState.garbageBlocks.length; i++) {
+                const garbage = gameState.garbageBlocks[i];
+                
+                // Check if match is adjacent to garbage
+                const isAdjacent = this.isMatchAdjacentToGarbage(match, garbage);
+                
+                if (isAdjacent) {
+                    affectedGarbage.add(i);
+                }
+            }
+        }
+        
+        // Process affected garbage (in reverse order to avoid index issues when removing)
+        const affectedIndices = Array.from(affectedGarbage).sort((a, b) => b - a);
+        
+        for (const index of affectedIndices) {
+            const garbage = gameState.garbageBlocks[index];
+            
+            // For horizontal garbage blocks or the bottom row of vertical garbage
+            if (garbage.height === 1 || (garbage.height > 1 && garbage.clearProgress === garbage.height - 1)) {
+                // Clear the entire garbage block
+                this.clearGarbageBlock(gameState, index);
+            } else {
+                // For taller garbage blocks, clear one row at a time from bottom
+                this.partiallyConvertGarbage(gameState, index);
+            }
+        }
+    }
+    
+    // Check if a match position is adjacent to a garbage block
+    isMatchAdjacentToGarbage(match, garbage) {
+        const { x, y } = match;
+        
+        // Check if match is directly adjacent (left, right, top, bottom) to the garbage
+        const isAdjacentLeft = x === garbage.x - 1 && y >= garbage.y && y < garbage.y + garbage.height;
+        const isAdjacentRight = x === garbage.x + garbage.width && y >= garbage.y && y < garbage.y + garbage.height;
+        const isAdjacentTop = y === garbage.y - 1 && x >= garbage.x && x < garbage.x + garbage.width;
+        const isAdjacentBottom = y === garbage.y + garbage.height && x >= garbage.x && x < garbage.x + garbage.width;
+        
+        return isAdjacentLeft || isAdjacentRight || isAdjacentTop || isAdjacentBottom;
+    }
+    
+    /**
+     * Helper method to ensure blocks near garbage are updated properly when the state changes
+     * For example, when a garbage block is cleared and a floating block is above it,
+     * this ensures the block starts falling to the new free position.
+     */
+    updateBlocksNearGarbage(gameState, garbageX, garbageY, garbageWidth, garbageHeight) {
+        // Check blocks directly above the garbage
+        for (let x = garbageX; x < garbageX + garbageWidth; x++) {
+            // Start from the row just above the garbage
+            const topRow = Math.max(0, garbageY - 1);
+            if (topRow >= 0 && gameState.grid[topRow][x]) {
+                // There's a block right above the garbage, queue it for falling check
+                setTimeout(() => {
+                    this.dropBlocks(gameState, false);
+                }, 50);
+                return; // Only need to trigger once
+            }
+        }
+    }
+    
+    // Clear an entire garbage block and replace with normal blocks
+    clearGarbageBlock(gameState, garbageIndex) {
+        const garbage = gameState.garbageBlocks[garbageIndex];
+        const garbageX = garbage.x;
+        const garbageY = garbage.y;
+        const garbageWidth = garbage.width;
+        const garbageHeight = garbage.height;
+        
+        // Step 1: Transform garbage into angry blocks
+        // Save original colorIndex for use in angry blocks
+        const originalColorIndex = garbage.colorIndex;
+        
+        // Create angry blocks in place of the garbage
+        for (let dy = 0; dy < garbage.height; dy++) {
+            for (let dx = 0; dx < garbage.width; dx++) {
+                const gridX = garbage.x + dx;
+                const gridY = garbage.y + dy;
+                
+                // Make sure we're within grid bounds
+                if (gridX >= 0 && gridX < GRID_X && gridY >= 0 && gridY < GRID_Y) {
+                    // Create an angry block with the same color as the garbage
+                    gameState.grid[gridY][gridX] = {
+                        type: garbage.colorIndex, // Store the color index
+                        state: 'angry',           // Special state for angry blocks
+                        animationStart: performance.now(), // For animation timing
+                        angriness: 1.0           // Will decrease as block transforms
+                    };
+                }
+            }
+        }
+        
+        // Remove the garbage block from the array
+        gameState.garbageBlocks.splice(garbageIndex, 1);
+        
+        // Step 2: Schedule the conversion of angry blocks to normal blocks with delay
+        let totalBlocks = garbageWidth * garbageHeight;
+        let blocksConverted = 0;
+        
+        const convertAngryBlocks = () => {
+            // Process one block at a time with visible delay
+            let foundAngryBlock = false;
+            
+            // Scan from left to right, top to bottom instead of randomly
+            for (let dy = 0; dy < garbageHeight; dy++) {
+                for (let dx = 0; dx < garbageWidth; dx++) {
+                    const gridX = garbageX + dx;
+                    const gridY = garbageY + dy;
+                    
+                    // Make sure we're within grid bounds
+                    if (gridX >= 0 && gridX < GRID_X && gridY >= 0 && gridY < GRID_Y) {
+                        const block = gameState.grid[gridY][gridX];
+                        
+                        // Check if this is an angry block
+                        if (block && typeof block === 'object' && block.state === 'angry') {
+                            // Convert angry block to normal block
+                            const randomElement = gameState.elements[Math.floor(Math.random() * gameState.elements.length)];
+                            gameState.grid[gridY][gridX] = randomElement;
+                            
+                            // Play a conversion sound
+                            audioManager.playSound('blockBreak', 0.3);
+                            
+                            blocksConverted++;
+                            foundAngryBlock = true;
+                            
+                            // Break out of both loops
+                            dy = garbageHeight;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Schedule next conversion if there are still angry blocks to convert
+            if (foundAngryBlock && blocksConverted < totalBlocks) {
+                setTimeout(convertAngryBlocks, 300); // 150ms delay between conversions (was 50ms)
+            } else {
+                // All blocks converted, check for matches or falling blocks
+                setTimeout(() => {
+                    const newMatches = this.findMatches(gameState);
+                    if (newMatches.length > 0) {
+                        this.removeMatches(gameState, newMatches, false);
+                    } else {
+                        // If no matches, check if other garbage blocks should fall
+                        this.dropGarbageBlocks(gameState);
+                        // Also check if regular blocks should fall
+                        this.dropBlocks(gameState, false);
+                        // Ensure blocks above the cleared garbage begin falling
+                        this.updateBlocksNearGarbage(gameState, garbageX, garbageY, garbageWidth, garbageHeight);
+                    }
+                }, 200); // Increased from 100ms
+            }
+        };
+        
+        // Start the conversion process after a longer delay to show angry blocks
+        setTimeout(convertAngryBlocks, 400); // 400ms delay (was 200ms)
+    }
+    
+    // Partially convert a garbage block, clearing one row from the bottom
+    partiallyConvertGarbage(gameState, garbageIndex) {
+        const garbage = gameState.garbageBlocks[garbageIndex];
+        const originalHeight = garbage.height;
+        
+        // Increase clear progress (moves up one row)
+        garbage.clearProgress = garbage.clearProgress || 0;
+        garbage.clearProgress++;
+        
+        // Get the bottom row to convert
+        const bottomY = garbage.y + garbage.height - garbage.clearProgress;
+        
+        // Step 1: Transform bottom row into angry blocks
+        for (let dx = 0; dx < garbage.width; dx++) {
+            const gridX = garbage.x + dx;
+            
+            // Make sure we're within grid bounds
+            if (gridX >= 0 && gridX < GRID_X && bottomY >= 0 && bottomY < GRID_Y) {
+                // Create an angry block with the same color as the garbage
+                gameState.grid[bottomY][gridX] = {
+                    type: garbage.colorIndex, // Store the color index
+                    state: 'angry',          // Special state for angry blocks
+                    animationStart: performance.now(), // For animation timing
+                    angriness: 1.0          // Will decrease as block transforms
+                };
+            }
+        }
+        
+        // Update the garbage block's size
+        garbage.height--;
+        
+        // If fully cleared, remove it
+        if (garbage.height <= 0) {
+            const garbageX = garbage.x;
+            const garbageY = garbage.y;
+            const garbageWidth = garbage.width;
+            gameState.garbageBlocks.splice(garbageIndex, 1);
+        }
+        
+        // Step 2: Schedule the conversion of angry blocks to normal blocks with delay
+        let totalBlocks = garbage.width;
+        let blocksConverted = 0;
+        
+        const convertAngryBlocks = () => {
+            // Process one block at a time with visible delay
+            let foundAngryBlock = false;
+            
+            // Scan from left to right instead of randomly
+            for (let dx = 0; dx < garbage.width; dx++) {
+                const gridX = garbage.x + dx;
+                
+                // Make sure we're within grid bounds
+                if (gridX >= 0 && gridX < GRID_X && bottomY >= 0 && bottomY < GRID_Y) {
+                    const block = gameState.grid[bottomY][gridX];
+                    
+                    // Check if this is an angry block
+                    if (block && typeof block === 'object' && block.state === 'angry') {
+                        // Convert angry block to normal block
+                        const randomElement = gameState.elements[Math.floor(Math.random() * gameState.elements.length)];
+                        gameState.grid[bottomY][gridX] = randomElement;
+                        
+                        // Play a conversion sound
+                        audioManager.playSound('blockBreak', 0.3);
+                        
+                        blocksConverted++;
+                        foundAngryBlock = true;
+                        break;
+                    }
+                }
+            }
+            
+            // Schedule next conversion if there are still angry blocks to convert
+            if (foundAngryBlock && blocksConverted < totalBlocks) {
+                setTimeout(convertAngryBlocks, 150); // 150ms delay between conversions (was 50ms)
+            } else {
+                // All blocks converted, check for matches or falling blocks
+                setTimeout(() => {
+                    const newMatches = this.findMatches(gameState);
+                    if (newMatches.length > 0) {
+                        this.removeMatches(gameState, newMatches, false);
+                    } else {
+                        // If no matches, check if other garbage blocks should fall
+                        this.dropGarbageBlocks(gameState);
+                        // Also check if regular blocks should fall
+                        this.dropBlocks(gameState, false);
+                        
+                        // Check if blocks above the garbage need to fall
+                        if (originalHeight > garbage.height) {
+                            this.updateBlocksNearGarbage(gameState, garbage.x, garbage.y, garbage.width, originalHeight);
+                        }
+                    }
+                }, 200); // Increased from 100ms
+            }
+        };
+        
+        // Start the conversion process after a longer delay to show angry blocks
+        setTimeout(convertAngryBlocks, 400); // 400ms delay (was 200ms)
+    }
+
+    updateFallingGarbage(gameState, currentTime) {
+        // Skip updating falling garbage if there are any angry blocks
+        if (this.hasAngryBlocks(gameState)) return;
+        
+        if (gameState.garbageBlocks.length === 0) return;
+        
+        const fallDuration = 300; // Duration of fall animation in ms (faster now)
+        
+        for (let i = 0; i < gameState.garbageBlocks.length; i++) {
+            const garbage = gameState.garbageBlocks[i];
+            
+            if (garbage.state !== 'falling') continue;
+            
+            const progress = Math.min((currentTime - garbage.fallStart) / fallDuration, 1);
+            
+            if (progress >= 1) {
+                // Garbage has finished falling
+                garbage.y = garbage.targetY;
+                garbage.currentY = garbage.targetY;
+                garbage.state = 'active';
+                
+                // Play landing sound
+                if (audioManager) {
+                    audioManager.playSound('blockLand');
+                }
+                
+                // Check if landing triggered other garbage to fall
+                if (progress === 1) { // Only do this once when progress first hits 1
+                    setTimeout(() => {
+                        this.dropGarbageBlocks(gameState);
+                        this.dropBlocks(gameState, false);
+                    }, 50);
+                }
+            } else {
+                // Use easing for smoother acceleration
+                const easedProgress = this.easeInOutQuad(progress);
+                
+                // Calculate smooth position for falling, accounting for startY
+                garbage.currentY = garbage.y + easedProgress * (garbage.targetY - garbage.y);
+            }
+        }
+    }
+    
+    // Quadratic easing function for smoother animations
+    easeInOutQuad(t) {
+        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    }
+
+    dropGarbageBlocks(gameState) {
+        let garbageFell = false;
+        
+        // First, identify stacks of garbage blocks
+        const stacks = this.identifyGarbageStacks(gameState);
+        
+        // Process each stack
+        for (const stackIndices of stacks) {
+            // Sort by Y-position within the stack (bottom-most first)
+            stackIndices.sort((a, b) => {
+                const garbageA = gameState.garbageBlocks[a];
+                const garbageB = gameState.garbageBlocks[b];
+                return (garbageB.y + garbageB.height) - (garbageA.y + garbageA.height);
+            });
+            
+            // Skip if any garbage in the stack is already falling
+            if (stackIndices.some(i => gameState.garbageBlocks[i].state === 'falling')) {
+                continue;
+            }
+            
+            // Check if there's space below this stack
+            let hasSpaceBelow = false;
+            let maxFallDistance = Infinity; // Start with maximum possible distance
+            
+            // Check for each garbage block in the stack
+            for (const garbageIndex of stackIndices) {
+                const garbage = gameState.garbageBlocks[garbageIndex];
+                
+                // Check each column of this garbage block
+                for (let x = garbage.x; x < garbage.x + garbage.width; x++) {
+                    let fallDistance = 0;
+                    
+                    // Check how far this column can fall
+                    const bottomY = garbage.y + garbage.height - 1;
+                    let blocked = false;
+                    
+                    for (let y = bottomY + 1; y < GRID_Y; y++) {
+                        // Stop if we hit a regular block
+                        if (gameState.grid[y][x]) {
+                            blocked = true;
+                            break;
+                        }
+                        
+                        // Check collision with any garbage block not in this stack
+                        let collidesWithOtherGarbage = false;
+                        for (let g = 0; g < gameState.garbageBlocks.length; g++) {
+                            // Skip garbage blocks that are part of this stack
+                            if (stackIndices.includes(g)) continue;
+                            
+                            const otherGarbage = gameState.garbageBlocks[g];
+                            
+                            // Check if this position is inside another garbage block
+                            if (x >= otherGarbage.x && 
+                                x < otherGarbage.x + otherGarbage.width && 
+                                y >= otherGarbage.y && 
+                                y < otherGarbage.y + otherGarbage.height) {
+                                collidesWithOtherGarbage = true;
+                                break;
+                            }
+                        }
+                        
+                        if (collidesWithOtherGarbage) {
+                            blocked = true;
+                            break;
+                        }
+                        
+                        fallDistance++;
+                    }
+                    
+                    if (blocked && fallDistance === 0) {
+                        // This column can't fall at all, so the stack can't fall
+                        hasSpaceBelow = false;
+                        maxFallDistance = 0;
+                        break;
+                    }
+                    
+                    hasSpaceBelow = true;
+                    // Track the smallest fall distance among all columns
+                    if (fallDistance < maxFallDistance) {
+                        maxFallDistance = fallDistance;
+                    }
+                }
+                
+                // If this garbage block can't fall, the whole stack can't fall
+                if (!hasSpaceBelow || maxFallDistance === 0) {
+                    break;
+                }
+            }
+            
+            // If there's space below, make the entire stack fall together
+            if (hasSpaceBelow && maxFallDistance > 0) {
+                const fallStart = performance.now();
+                
+                // Make all garbage blocks in the stack fall together
+                for (const index of stackIndices) {
+                    const garbage = gameState.garbageBlocks[index];
+                    garbage.state = 'falling';
+                    garbage.fallStart = fallStart; // Same start time for synchronized falling
+                    garbage.targetY = garbage.y + maxFallDistance;
+                    garbage.currentY = garbage.y;
+                }
+                
+                garbageFell = true;
+            }
+        }
+        
+        return garbageFell;
+    }
+    
+    // Helper function to identify stacks of garbage blocks
+    identifyGarbageStacks(gameState) {
+        const stacks = [];
+        const processed = new Set();
+        
+        // For each garbage block
+        for (let i = 0; i < gameState.garbageBlocks.length; i++) {
+            // Skip if already processed
+            if (processed.has(i)) continue;
+            
+            // Start a new stack with this garbage block
+            const stack = [i];
+            processed.add(i);
+            
+            // Find all other garbage blocks in this stack
+            this.findGarbageInStack(gameState, i, stack, processed);
+            
+            // Add the complete stack
+            stacks.push(stack);
+        }
+        
+        return stacks;
+    }
+    
+    // Recursively find garbage blocks that are part of the same stack
+    findGarbageInStack(gameState, garbageIndex, stack, processed) {
+        const garbage = gameState.garbageBlocks[garbageIndex];
+        
+        // Look at all other garbage blocks
+        for (let i = 0; i < gameState.garbageBlocks.length; i++) {
+            // Skip if already in a stack
+            if (processed.has(i) || i === garbageIndex) continue;
+            
+            const otherGarbage = gameState.garbageBlocks[i];
+            
+            // Check if directly stacked (one on top of the other)
+            const isDirectlyAbove = 
+                otherGarbage.y + otherGarbage.height === garbage.y && // otherGarbage sits directly on top of garbage
+                this.garbageBlocksOverlap(otherGarbage, garbage);
+                
+            const isDirectlyBelow = 
+                garbage.y + garbage.height === otherGarbage.y && // garbage sits directly on top of otherGarbage
+                this.garbageBlocksOverlap(garbage, otherGarbage);
+            
+            if (isDirectlyAbove || isDirectlyBelow) {
+                // Add to stack and mark as processed
+                stack.push(i);
+                processed.add(i);
+                
+                // Recursively find more connected blocks
+                this.findGarbageInStack(gameState, i, stack, processed);
+            }
+        }
+    }
+    
+    // Check if two garbage blocks overlap horizontally
+    garbageBlocksOverlap(garbage1, garbage2) {
+        return !(
+            garbage1.x + garbage1.width <= garbage2.x || 
+            garbage1.x >= garbage2.x + garbage2.width
+        );
+    }
+
+    isPositionInsideGarbage(gameState, x, y) {
+        for (const garbage of gameState.garbageBlocks) {
+            if (x >= garbage.x && x < garbage.x + garbage.width &&
+                y >= garbage.y && y < garbage.y + garbage.height) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Helper method to check if there are any angry blocks in the grid
+    hasAngryBlocks(gameState) {
+        // Check the grid for any blocks with state 'angry'
+        for (let y = 0; y < GRID_Y; y++) {
+            for (let x = 0; x < GRID_X; x++) {
+                const block = gameState.grid[y][x];
+                if (block && typeof block === 'object' && block.state === 'angry') {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }
 
 // Start game when page loads
 window.addEventListener('load', () => {
     new VersusGame();
-}); 
+});

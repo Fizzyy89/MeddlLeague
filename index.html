@@ -47,8 +47,8 @@
   </div>
 
   <div id="volumeControl">
-    <button id="muteBtn">🔊</button>
-    <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.3">
+    <div id="muteBtn">🔊</div>
+    <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.3">
   </div>
 
   <div id="optionsModal" class="modal-overlay">
@@ -141,23 +141,31 @@
                 <div class="volume-group">
                   <label for="masterVolume">
                     <span class="volume-label">MASTER</span>
-                    <button class="mute-btn" id="masterMuteBtn">🔊</button>
+                    <div class="mute-indicator" id="masterMuteBtn">🔊</div>
                   </label>
-                  <input type="range" id="masterVolume" min="0" max="1" step="0.1" value="0.3">
+                  <input type="range" id="masterVolume" min="0" max="1" step="0.05" value="0.3">
                 </div>
                 <div class="volume-group">
                   <label for="musicVolume">
                     <span class="volume-label">MUSIC</span>
-                    <button class="mute-btn" id="musicMuteBtn">🔊</button>
+                    <div class="mute-indicator" id="musicMuteBtn">🔊</div>
                   </label>
-                  <input type="range" id="musicVolume" min="0" max="1" step="0.1" value="0.8">
+                  <input type="range" id="musicVolume" min="0" max="1" step="0.05" value="0.8">
                 </div>
                 <div class="volume-group">
                   <label for="sfxVolume">
                     <span class="volume-label">SOUND FX</span>
-                    <button class="mute-btn" id="sfxMuteBtn">🔊</button>
+                    <div class="mute-indicator" id="sfxMuteBtn">🔊</div>
                   </label>
-                  <input type="range" id="sfxVolume" min="0" max="1" step="0.1" value="0.8">
+                  <input type="range" id="sfxVolume" min="0" max="1" step="0.05" value="0.8">
+                </div>
+                <div class="sound-personality-option">
+                  <label for="playerSoundSet">PLAYER SOUND SET</label>
+                  <select id="playerSoundSet">
+                    <option value="default">Default</option>
+                    <option value="drachenlord">Drachenlord</option>
+                  </select>
+                  <button id="previewPlayerSound" class="preview-sound-btn">🔊 Preview</button>
                 </div>
                 <div class="checkbox-option">
                   <label for="useAltPopSound">
@@ -214,6 +222,7 @@
 
   <script type="module">
     import { audioManager } from './js/audio.js';
+    import './js/volume-control.js';  // Import volume control for consistent behavior
     
     const bgMusic = document.getElementById('bgMusic');
     const volumeSlider = document.getElementById('volumeSlider');
@@ -299,17 +308,13 @@
     }
 
     // Load saved settings
-    const savedVolume = localStorage.getItem('volume') || 0.3;
-    const savedMuted = localStorage.getItem('muted') === 'true';
     const savedSpeed = localStorage.getItem('gameSpeed') || '3';
     const savedDifficulty = localStorage.getItem('gameDifficulty') || 'easy';
     const savedAiDifficulty = localStorage.getItem('aiDifficulty') || '2';
     
-    // Initial setup
-    bgMusic.volume = savedVolume;
-    bgMusic.muted = savedMuted;
-    volumeSlider.value = savedVolume;
-    muteBtn.textContent = savedMuted ? '🔇' : '🔊';
+    // Initial setup - use AudioManager's volume settings
+    volumeSlider.value = audioManager.masterVolume;
+    muteBtn.textContent = audioManager.masterVolume === 0 ? '🔇' : '🔊';
     speedSlider.value = savedSpeed;
     speedValue.textContent = savedSpeed;
     
@@ -417,12 +422,16 @@
       const selectedSpeed = parseInt(speedSlider.value);
       const useAltPopSound = document.getElementById('useAltPopSound').checked;
       const selectedAiDifficulty = parseInt(document.getElementById('aiDifficultySlider').value);
+      const selectedPlayerSoundSet = document.getElementById('playerSoundSet').value;
       
       localStorage.setItem('gameSpeed', selectedSpeed);
       localStorage.setItem('gameDifficulty', selectedDifficulty);
       localStorage.setItem('useAltPopSound', useAltPopSound);
       localStorage.setItem('aiDifficulty', selectedAiDifficulty);
+      localStorage.setItem('playerPersonality', selectedPlayerSoundSet);
+      
       audioManager.useAltPopSound = useAltPopSound;
+      audioManager.setPlayerPersonality(selectedPlayerSoundSet);
       
       // Show save confirmation
       saveButton.textContent = 'Saved!';
@@ -435,19 +444,9 @@
     });
     
     // Volume Controls
-    volumeSlider.addEventListener('input', (e) => {
-      const newVolume = e.target.value;
-      bgMusic.volume = newVolume;
-      localStorage.setItem('volume', newVolume);
-      muteBtn.textContent = newVolume === '0' ? '🔇' : '🔊';
-    });
-
-    muteBtn.addEventListener('click', () => {
-      bgMusic.muted = !bgMusic.muted;
-      localStorage.setItem('muted', bgMusic.muted);
-      muteBtn.textContent = bgMusic.muted ? '🔇' : '🔊';
-    });
-
+    // The volume control is now handled by volume-control.js
+    // No need for volumeSlider event listeners here
+    
     // Start music after first interaction
     document.addEventListener('click', function initAudio() {
       audioManager.bgMusic.play().catch(console.error);
@@ -670,11 +669,84 @@
             gap: 8px;
         }
 
+        .mute-indicator {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.2em;
+            cursor: default;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            pointer-events: none;
+            width: 24px;
+            height: 24px;
+        }
+
         .volume-control .checkbox-option {
             margin-top: 5px;
             padding: 10px;
             background: rgba(0, 0, 0, 0.2);
             border-radius: 6px;
+        }
+        
+        .sound-personality-option {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+        }
+        
+        .sound-personality-option label {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.7rem;
+            color: #fff;
+            margin-bottom: 5px;
+        }
+        
+        .sound-personality-option select {
+            width: 100%;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .sound-personality-option select:hover {
+            background: rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .preview-sound-btn {
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 5px;
+        }
+        
+        .preview-sound-btn:hover {
+            background: rgba(0, 0, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: scale(1.02);
+        }
+        
+        .preview-sound-btn:active {
+            transform: scale(0.98);
         }
 
         @media (max-width: 768px) {
@@ -709,6 +781,10 @@
     const useAltPopSoundCheckbox = document.getElementById('useAltPopSound');
     useAltPopSoundCheckbox.checked = audioManager.useAltPopSound;
 
+    // Set initial state of player sound set select
+    const playerSoundSetSelect = document.getElementById('playerSoundSet');
+    playerSoundSetSelect.value = audioManager.currentPlayerPersonality;
+
     // Add sound preview when toggling the checkbox
     useAltPopSoundCheckbox.addEventListener('change', (e) => {
         // Play the corresponding sound based on the new state
@@ -719,12 +795,19 @@
         }
     });
 
+    // Add preview button functionality for player sound set
+    const previewPlayerSoundBtn = document.getElementById('previewPlayerSound');
+    previewPlayerSoundBtn.addEventListener('click', () => {
+        const selectedPersonality = playerSoundSetSelect.value;
+        // Play a pop sound from the selected personality
+        audioManager.playPlayerSound('pop', selectedPersonality);
+    });
+
     // Audio control event listeners
     masterVolumeSlider.addEventListener('input', (e) => {
         const volume = parseFloat(e.target.value);
         audioManager.setMasterVolume(volume);
         masterMuteBtn.textContent = volume === 0 ? '🔇' : '🔊';
-        masterMuteBtn.classList.toggle('muted', volume === 0);
         
         // Update the game's volume slider if it exists
         const gameVolumeSlider = document.getElementById('volumeSlider');
@@ -735,30 +818,12 @@
 
     musicVolumeSlider.addEventListener('input', (e) => {
         audioManager.setMusicVolume(parseFloat(e.target.value));
+        musicMuteBtn.textContent = e.target.value === '0' ? '🔇' : '🔊';
     });
 
     sfxVolumeSlider.addEventListener('input', (e) => {
         audioManager.setSFXVolume(parseFloat(e.target.value));
-    });
-
-    masterMuteBtn.addEventListener('click', () => {
-        const newVolume = audioManager.masterVolume === 0 ? 0.3 : 0;
-        audioManager.setMasterVolume(newVolume);
-        masterVolumeSlider.value = newVolume;
-        masterMuteBtn.textContent = newVolume === 0 ? '🔇' : '🔊';
-        masterMuteBtn.classList.toggle('muted', newVolume === 0);
-    });
-
-    musicMuteBtn.addEventListener('click', () => {
-        const isMuted = audioManager.toggleMusicMute();
-        musicMuteBtn.textContent = isMuted ? '🔇' : '🔊';
-        musicMuteBtn.classList.toggle('muted', isMuted);
-    });
-
-    sfxMuteBtn.addEventListener('click', () => {
-        const isMuted = audioManager.toggleSFXMute();
-        sfxMuteBtn.textContent = isMuted ? '🔇' : '🔊';
-        sfxMuteBtn.classList.toggle('muted', isMuted);
+        sfxMuteBtn.textContent = e.target.value === '0' ? '🔇' : '🔊';
     });
 
     // Theme mappings
@@ -880,6 +945,23 @@
         }
     `;
     document.head.appendChild(audioStyles);
+
+    // Add pageshow event listener to update the menu volume slider 
+    // whenever the user returns to this page
+    window.addEventListener('pageshow', function() {
+      // Get the most recent volume from localStorage
+      const currentVolume = parseFloat(localStorage.getItem('masterVolume') ?? '0.3');
+      
+      // Update the menu volume slider
+      if (volumeSlider) {
+        volumeSlider.value = currentVolume;
+      }
+      
+      // Update the mute button text
+      if (muteBtn) {
+        muteBtn.textContent = currentVolume === 0 ? '🔇' : '🔊';
+      }
+    });
   </script>
 </body>
 </html> 
