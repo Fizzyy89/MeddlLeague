@@ -1,4 +1,4 @@
-import { GRID_X, GRID_Y, ELEMENTS, BLOCK_SIZE, GAP, GRID_PADDING, GAME_PADDING } from './config.js';
+import { GRID_X, GRID_Y, BLOCK_SIZE, GAP, GRID_PADDING } from './config.js';
 import { audioManager } from './audio.js';
 import { AIPlayer } from './ai-player.js';
 
@@ -1040,7 +1040,7 @@ class VersusGame {
             }
         }
     }
-    
+
     addFloatingScore(gameState, x, y, baseScore, chainLevel) {
         const multiplier = chainLevel > 0 ? Math.pow(2, chainLevel) : 1;
         const totalScore = baseScore * multiplier;
@@ -1250,12 +1250,12 @@ class VersusGame {
                     }
                     
                     if (canFall) {
-                        // Found a block that can fall
-                        let fallDistance = 1;
-                        let targetY = y + 1;
-                        
-                        // Find how far it can fall
-                        while (targetY + 1 < GRID_Y && !gameState.grid[targetY + 1][x]) {
+                    // Found a block that can fall
+                    let fallDistance = 1;
+                    let targetY = y + 1;
+                    
+                    // Find how far it can fall
+                    while (targetY + 1 < GRID_Y && !gameState.grid[targetY + 1][x]) {
                             // Check if there's a garbage block at this position
                             let garbageBlockInTheWay = false;
                             
@@ -1274,25 +1274,25 @@ class VersusGame {
                             // If there's a garbage block in the way, stop falling
                             if (garbageBlockInTheWay) break;
                             
-                            fallDistance++;
-                            targetY++;
-                        }
-                        
-                        // Create falling block object
-                        const block = {
-                            type: typeof gameState.grid[y][x] === 'object' ? gameState.grid[y][x].type : gameState.grid[y][x],
-                            state: 'falling',
-                            startY: y,
-                            targetY: targetY,
-                            currentY: y,
-                            fallStart: performance.now()
-                        };
-                        
-                        // Update grid
-                        gameState.grid[targetY][x] = block;
-                        gameState.grid[y][x] = null;
-                        gameState.fallingBlocks.add(`${x},${targetY}`);
-                        blocksFell = true;
+                        fallDistance++;
+                        targetY++;
+                    }
+                    
+                    // Create falling block object
+                    const block = {
+                        type: typeof gameState.grid[y][x] === 'object' ? gameState.grid[y][x].type : gameState.grid[y][x],
+                        state: 'falling',
+                        startY: y,
+                        targetY: targetY,
+                        currentY: y,
+                        fallStart: performance.now()
+                    };
+                    
+                    // Update grid
+                    gameState.grid[targetY][x] = block;
+                    gameState.grid[y][x] = null;
+                    gameState.fallingBlocks.add(`${x},${targetY}`);
+                    blocksFell = true;
                     }
                 }
             }

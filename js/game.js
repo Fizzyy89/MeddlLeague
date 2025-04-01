@@ -1,4 +1,39 @@
-import { GRID_X, GRID_Y, ELEMENTS, BLOCK_SIZE, GAP, GRID_PADDING } from './config.js';
+import { 
+    GRID_X, GRID_Y, BLOCK_SIZE, GAP, GRID_PADDING,
+    DEFAULT_SPEED, DEFAULT_DIFFICULTY,
+    SPEED_SETTINGS, DIFFICULTY_MULTIPLIERS,
+    BACKGROUND_SETTINGS,
+    SWAP_ANIMATION_DURATION,
+    MATCH_FLASH_DURATION,
+    POP_ANIMATION_DURATION,
+    FALL_ANIMATION_DURATION,
+    FLOATING_SCORE_DURATION,
+    MATCH_COUNT_POPUP_DURATION,
+    CHAIN_DISPLAY_DURATION,
+    CHAIN_TIMEOUT,
+    FPS_SAMPLE_SIZE,
+    FALL_SPEED,
+    MANUAL_RISING_SPEED,
+    UI_SETTINGS,
+    BLOCK_CORNER_RADIUS,
+    CURSOR_CORNER_RADIUS,
+    CURSOR_GLOW_RADIUS,
+    CURSOR_PADDING,
+    CURSOR_GLOW_PADDING,
+    BLOCK_SHADOW_BLUR,
+    BLOCK_SHADOW_OFFSET,
+    PREVIEW_ROW_OPACITY,
+    BLOCK_FONT_SIZE,
+    BLOCK_FONT_FAMILY,
+    FLOATING_SCORE_FONT_SIZE,
+    CHAIN_MULTIPLIER_FONT_SIZE,
+    MATCH_COUNT_FONT_SIZE,
+    CHAIN_DISPLAY_FONT_SIZE,
+    DANGER_PULSE_DURATION,
+    ANIMATION_EFFECTS,
+    GAME_RULES,
+    DANGER_WARNING_DURATIONS
+} from './config.js';
 import { audioManager } from './audio.js';
 
 class CanvasGame {
@@ -13,7 +48,7 @@ class CanvasGame {
         
         // Add timing and interpolation properties
         this.frameCount = 0;
-        this.frameTimes = new Array(60).fill(0); // For FPS smoothing
+        this.frameTimes = new Array(FPS_SAMPLE_SIZE).fill(0); // For FPS smoothing
         this.rafId = null;
         
         // Initialize background effect arrays
@@ -25,8 +60,8 @@ class CanvasGame {
         this.baseHeight = (GRID_Y * BLOCK_SIZE) + ((GRID_Y - 1) * GAP) + (GRID_PADDING * 2);
         
         // Get saved settings
-        const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
-        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'easy';
+        const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || DEFAULT_SPEED;
+        const savedDifficulty = localStorage.getItem('gameDifficulty') || DEFAULT_DIFFICULTY;
         
         // Game state initialization
         this.grid = [];
@@ -50,13 +85,7 @@ class CanvasGame {
         };
 
         // Difficulty multipliers for speed increase
-        this.difficultyMultipliers = {
-            'very-easy': 0.3,   // Speed increases 30% slower than normal
-            'easy': 0.6,        // Speed increases 60% slower than normal
-            'normal': 1.0,      // Normal speed increase
-            'hard': 1.5,        // Speed increases 50% faster than normal
-            'very-hard': 2.0    // Speed increases twice as fast
-        };
+        this.difficultyMultipliers = DIFFICULTY_MULTIPLIERS;
 
         // Speed progression tracking
         this.speedState = {
@@ -64,14 +93,14 @@ class CanvasGame {
             currentSpeed: savedSpeed,
             difficulty: savedDifficulty,
             lastSpeedIncrease: performance.now(),
-            baseIncreaseInterval: 30000,
-            baseSpeedIncrease: 1
+            baseIncreaseInterval: SPEED_SETTINGS.BASE_INCREASE_INTERVAL,
+            baseSpeedIncrease: SPEED_SETTINGS.BASE_SPEED_INCREASE
         };
         
         // Falling state tracking
         this.fallingBlocks = new Set();
         this.lastFrameTime = performance.now();
-        this.fallSpeed = 600;
+        this.fallSpeed = FALL_SPEED;
         
         // Rising state initialization
         this.risingState = {
@@ -130,12 +159,13 @@ class CanvasGame {
         this.dangerState = {
             active: false,
             startTime: 0,
-            warningDuration: 3000
+            warningDuration: DANGER_WARNING_DURATIONS[savedDifficulty],
+            isFinalWarning: false
         };
 
         // Add manual rising state
         this.manualRising = false;
-        this.manualRisingSpeed = 1; // Increased from 0.8 to 1 for faster manual rising
+        this.manualRisingSpeed = MANUAL_RISING_SPEED;
         
         // Initialize game components in order
         this.initGrid();                // First create the grid
@@ -146,7 +176,7 @@ class CanvasGame {
         this.swapState = {
             isAnimating: false,
             startTime: 0,
-            duration: 200,  // Increased slightly for smoother animation
+            duration: SWAP_ANIMATION_DURATION,
             x1: 0,
             x2: 0,
             y: 0,
@@ -189,21 +219,21 @@ class CanvasGame {
     
     resize() {
         // Calculate available width (accounting for margins and padding)
-        const totalAvailableWidth = window.innerWidth - 80; // Subtract margins
+        const totalAvailableWidth = window.innerWidth - UI_SETTINGS.MARGIN_HORIZONTAL;
         
         // Limit max width while allowing it to grow with screen size
-        const maxWidth = Math.min(500, totalAvailableWidth); // Changed from 560 to 480 to match versus
+        const maxWidth = Math.min(UI_SETTINGS.MAX_GAME_WIDTH, totalAvailableWidth);
         
         // Calculate available height (accounting for UI elements)
-        const availableHeight = window.innerHeight - 200; // -200 for margins/UI
+        const availableHeight = window.innerHeight - UI_SETTINGS.MARGIN_VERTICAL;
         
         // Calculate maximum scale that fits in available space
         const maxScaleX = maxWidth / this.baseWidth;
         const maxScaleY = availableHeight / this.baseHeight;
         
         // Set minimum and maximum scales
-        const minScale = 0.4;    // Changed from 0.6 to 0.4 to match versus
-        const maxScale = 1.2;    // Changed from 1.8 to 1.2 to match versus
+        const minScale = UI_SETTINGS.MIN_SCALE;
+        const maxScale = UI_SETTINGS.MAX_SCALE;
         
         // Calculate optimal scale
         this.scale = Math.min(maxScaleX, maxScaleY, maxScale);
@@ -235,7 +265,7 @@ class CanvasGame {
                     do {
                         color = this.elements[Math.floor(Math.random() * this.elements.length)];
                         attempts++;
-                        if (attempts > 10) break;
+                        if (attempts > GAME_RULES.MAX_BLOCK_ATTEMPTS) break;
                     } while (
                         (x >= 2 && color === this.grid[y][x-1] && color === this.grid[y][x-2]) ||
                         (y >= 2 && color === this.grid[y-1][x] && color === this.grid[y-2][x])
@@ -401,21 +431,25 @@ class CanvasGame {
         
         // Add danger animation for ALL blocks when in final warning
         if (this.dangerState.active && this.dangerState.isFinalWarning) {
-            const dangerProgress = (currentTime - this.dangerState.startTime) / 300;
-            const dangerPulse = Math.sin(dangerProgress * Math.PI * 2) * 0.3 + 0.7;
+            const dangerProgress = (currentTime - this.dangerState.startTime) / DANGER_PULSE_DURATION;
+            const dangerPulse = Math.sin(dangerProgress * Math.PI * 2) * 
+                ((ANIMATION_EFFECTS.DANGER_PULSE_MAX - ANIMATION_EFFECTS.DANGER_PULSE_MIN) / 2) + 
+                ANIMATION_EFFECTS.DANGER_PULSE_MIN;
             
             this.ctx.save();
             this.ctx.shadowColor = 'red';
-            this.ctx.shadowBlur = 20;
+            this.ctx.shadowBlur = ANIMATION_EFFECTS.DANGER_SHADOW_BLUR;
             this.ctx.globalAlpha *= dangerPulse;
-        } else if (y < 3 && this.dangerState.active) {
-            // Normal danger state for top 3 rows
-            const dangerProgress = (currentTime - this.dangerState.startTime) / 300;
-            const dangerPulse = Math.sin(dangerProgress * Math.PI * 2) * 0.3 + 0.7;
+        } else if (y < GAME_RULES.DANGER_TOP_ROWS && this.dangerState.active) {
+            // Normal danger state for top rows
+            const dangerProgress = (currentTime - this.dangerState.startTime) / DANGER_PULSE_DURATION;
+            const dangerPulse = Math.sin(dangerProgress * Math.PI * 2) * 
+                ((ANIMATION_EFFECTS.DANGER_PULSE_MAX - ANIMATION_EFFECTS.DANGER_PULSE_MIN) / 2) + 
+                ANIMATION_EFFECTS.DANGER_PULSE_MIN;
             
             this.ctx.save();
             this.ctx.shadowColor = 'red';
-            this.ctx.shadowBlur = 20;
+            this.ctx.shadowBlur = ANIMATION_EFFECTS.DANGER_SHADOW_BLUR;
             this.ctx.globalAlpha *= dangerPulse;
         }
         
@@ -423,18 +457,22 @@ class CanvasGame {
         this.ctx.fillStyle = this.getBlockColor(blockType);
         
         if (blockState === 'matching') {
-            const progress = (currentTime - block.animationStart) / 300;
+            const progress = (currentTime - block.animationStart) / POP_ANIMATION_DURATION;
             
             // Gentle glow effect
             this.ctx.shadowColor = this.getBlockColor(blockType);
-            this.ctx.shadowBlur = 10;
+            this.ctx.shadowBlur = ANIMATION_EFFECTS.MATCH_SHADOW_BLUR;
             
             // Subtle pulse that doesn't go too transparent
-            const alpha = 0.8 + Math.sin(progress * Math.PI * 4) * 0.2;
+            const alpha = ANIMATION_EFFECTS.MATCH_ALPHA_MIN + 
+                Math.sin(progress * Math.PI * 4) * 
+                (ANIMATION_EFFECTS.MATCH_ALPHA_MAX - ANIMATION_EFFECTS.MATCH_ALPHA_MIN);
             this.ctx.globalAlpha = alpha;
             
             // Very subtle scale pulse
-            const scale = 1 + Math.sin(progress * Math.PI * 4) * 0.05;
+            const scale = ANIMATION_EFFECTS.MATCH_SCALE_MIN + 
+                Math.sin(progress * Math.PI * 4) * 
+                (ANIMATION_EFFECTS.MATCH_SCALE_MAX - ANIMATION_EFFECTS.MATCH_SCALE_MIN);
             this.ctx.translate(centerX, centerY);
             this.ctx.scale(scale, scale);
             this.ctx.translate(-centerX, -centerY);
@@ -488,7 +526,7 @@ class CanvasGame {
         }
         
         this.ctx.beginPath();
-        this.ctx.roundRect(xPos, yPos, BLOCK_SIZE, BLOCK_SIZE, 8);
+        this.ctx.roundRect(xPos, yPos, BLOCK_SIZE, BLOCK_SIZE, BLOCK_CORNER_RADIUS);
         this.ctx.fill();
         
         // Reset effects
@@ -503,7 +541,7 @@ class CanvasGame {
         // Draw symbol with gentler animation
         const symbol = this.blockSymbols[blockType];
         if (symbol) {
-            this.ctx.font = '30px Arial';
+            this.ctx.font = `${BLOCK_FONT_SIZE}px ${BLOCK_FONT_FAMILY}`;
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             
@@ -540,9 +578,9 @@ class CanvasGame {
             } else {
                 // Normal emoji rendering
                 this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                this.ctx.shadowBlur = 4;
-                this.ctx.shadowOffsetX = 2;
-                this.ctx.shadowOffsetY = 2;
+                this.ctx.shadowBlur = BLOCK_SHADOW_BLUR;
+                this.ctx.shadowOffsetX = BLOCK_SHADOW_OFFSET;
+                this.ctx.shadowOffsetY = BLOCK_SHADOW_OFFSET;
                 this.ctx.fillStyle = 'white';
                 this.ctx.fillText(symbol, centerX, centerY);
             }
@@ -561,7 +599,7 @@ class CanvasGame {
         }
 
         if ((this.dangerState.active && this.dangerState.isFinalWarning) || 
-            (y < 3 && this.dangerState.active)) {
+            (y < GAME_RULES.DANGER_TOP_ROWS && this.dangerState.active)) {
             this.ctx.restore();
         }
     }
@@ -574,14 +612,18 @@ class CanvasGame {
         this.ctx.strokeStyle = 'white';
         this.ctx.lineWidth = 3;
         this.ctx.beginPath();
-        this.ctx.roundRect(xPos - 3, yPos - 3, (BLOCK_SIZE * 2) + GAP + 6, BLOCK_SIZE + 6, 8);
+        this.ctx.roundRect(xPos - CURSOR_PADDING, yPos - CURSOR_PADDING, 
+            (BLOCK_SIZE * 2) + GAP + (CURSOR_PADDING * 2), 
+            BLOCK_SIZE + (CURSOR_PADDING * 2), CURSOR_CORNER_RADIUS);
         this.ctx.stroke();
         
         // Draw cursor glow
         this.ctx.strokeStyle = 'rgba(255,255,255,0.3)';
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.roundRect(xPos - 5, yPos - 5, (BLOCK_SIZE * 2) + GAP + 10, BLOCK_SIZE + 10, 10);
+        this.ctx.roundRect(xPos - CURSOR_GLOW_PADDING, yPos - CURSOR_GLOW_PADDING, 
+            (BLOCK_SIZE * 2) + GAP + (CURSOR_GLOW_PADDING * 2), 
+            BLOCK_SIZE + (CURSOR_GLOW_PADDING * 2), CURSOR_GLOW_RADIUS);
         this.ctx.stroke();
     }
     
@@ -614,7 +656,7 @@ class CanvasGame {
         this.swapState = {
             isAnimating: true,
             startTime: performance.now(),
-            duration: 150,
+            duration: SWAP_ANIMATION_DURATION,
             x1, x2, y,
             block1: block1 ? {
                 type: typeof block1 === 'object' ? block1.type : block1,
@@ -641,7 +683,7 @@ class CanvasGame {
             } else {
                 this.checkMatches();
             }
-        }, this.swapState.duration);
+        }, SWAP_ANIMATION_DURATION);
     }
     
     findMatches() {
@@ -655,7 +697,7 @@ class CanvasGame {
                     this.grid[y][x] === this.grid[y][x-1]) {
                     count++;
                 } else {
-                    if (count >= 3) {
+                    if (count >= GAME_RULES.MIN_MATCH_SIZE) {
                         for (let i = x - count; i < x; i++) {
                             matches.add(`${i},${y}`);
                         }
@@ -664,7 +706,7 @@ class CanvasGame {
                 }
             }
             // Check end of row
-            if (count >= 3) {
+            if (count >= GAME_RULES.MIN_MATCH_SIZE) {
                 for (let i = GRID_X - count; i < GRID_X; i++) {
                     matches.add(`${i},${y}`);
                 }
@@ -679,7 +721,7 @@ class CanvasGame {
                     this.grid[y][x] === this.grid[y-1][x]) {
                     count++;
                 } else {
-                    if (count >= 3) {
+                    if (count >= GAME_RULES.MIN_MATCH_SIZE) {
                         for (let i = y - count; i < y; i++) {
                             matches.add(`${x},${i}`);
                         }
@@ -688,7 +730,7 @@ class CanvasGame {
                 }
             }
             // Check end of column
-            if (count >= 3) {
+            if (count >= GAME_RULES.MIN_MATCH_SIZE) {
                 for (let i = GRID_Y - count; i < GRID_Y; i++) {
                     matches.add(`${x},${i}`);
                 }
@@ -730,7 +772,7 @@ class CanvasGame {
             x: screenX,
             y: screenY,
             startTime: performance.now(),
-            duration: 1000, // 1 second animation
+            duration: FLOATING_SCORE_DURATION,
             opacity: 1
         });
     }
@@ -748,7 +790,7 @@ class CanvasGame {
             x: screenX,
             y: screenY,
             startTime: performance.now(),
-            duration: 1500, // Longer duration for the full animation
+            duration: MATCH_COUNT_POPUP_DURATION,
             opacity: 1
         });
     }
@@ -767,17 +809,17 @@ class CanvasGame {
             
             if (score.multiplier > 1) {
                 // Draw total score first (centered)
-                this.ctx.font = 'bold 32px "Press Start 2P"';
+                this.ctx.font = `bold ${FLOATING_SCORE_FONT_SIZE}px "Press Start 2P"`;
                 this.ctx.fillStyle = `rgba(255,180,0,${opacity})`;
                 this.ctx.fillText(`${score.totalScore}`, score.x, y);
                 
                 // Draw chain multiplier to the right and slightly up
-                this.ctx.font = 'bold 28px "Press Start 2P"';
+                this.ctx.font = `bold ${CHAIN_MULTIPLIER_FONT_SIZE}px "Press Start 2P"`;
                 this.ctx.fillStyle = `rgba(255,220,0,${opacity})`;
                 this.ctx.fillText(`×${score.multiplier}`, score.x + 80, y - 10);
             } else {
                 // Just draw the score for non-chain matches
-                this.ctx.font = 'bold 24px "Press Start 2P"';
+                this.ctx.font = `bold ${MATCH_COUNT_FONT_SIZE}px "Press Start 2P"`;
                 this.ctx.fillStyle = `rgba(255,255,255,${opacity})`;
                 this.ctx.fillText(`${score.baseScore}`, score.x, y);
             }
@@ -928,7 +970,7 @@ class CanvasGame {
         this.ctx.scale(scale, scale);
         
         // Draw chain number
-        this.ctx.font = 'bold 48px "Press Start 2P"';
+        this.ctx.font = `bold ${CHAIN_DISPLAY_FONT_SIZE}px "Press Start 2P"`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
         
@@ -1013,7 +1055,7 @@ class CanvasGame {
             document.getElementById('highScoreValue').textContent = this.score;
         }
 
-        // First phase: Flash the blocks (800ms)
+        // First phase: Flash the blocks
         matches.forEach(({x, y}) => {
             if (this.grid[y][x]) {
                 this.grid[y][x] = {
@@ -1038,7 +1080,7 @@ class CanvasGame {
                         };
                         audioManager.playPopSound(false);
                     }
-                }, index * 200);
+                }, index * POP_ANIMATION_DURATION);
                 
                 setTimeout(() => {
                     if (this.grid[y][x]) {
@@ -1049,14 +1091,14 @@ class CanvasGame {
                         // After last block is removed, start dropping and check for chains
                         this.dropBlocks(true); // Pass true to indicate checking for chains
                     }
-                }, index * 200 + 200);
+                }, index * POP_ANIMATION_DURATION + POP_ANIMATION_DURATION);
             });
-        }, 600);
+        }, MATCH_FLASH_DURATION);
 
         // Set chain timer to reset counter if no new matches occur
         this.chainTimer = setTimeout(() => {
             this.chainCounter = 0;
-        }, 2000); // Reset chain if no new matches within 2 seconds
+        }, CHAIN_TIMEOUT);
     }
     
     checkMatches() {
@@ -1075,7 +1117,7 @@ class CanvasGame {
             do {
                 color = this.elements[Math.floor(Math.random() * this.elements.length)];
                 attempts++;
-                if (attempts > 10) break;
+                if (attempts > GAME_RULES.MAX_BLOCK_ATTEMPTS) break;
             } while (
                 // Check horizontal matches within preview row
                 (x >= 2 && color === this.risingState.previewRow[x-1] && 
@@ -1113,8 +1155,8 @@ class CanvasGame {
         // Calculate elapsed time since last frame in seconds
         const deltaTime = (currentTime - this.lastFrameTime) / 1000;
         
-        // Only allow manual rising if not in danger state
-        const canManualRise = this.manualRising && !this.dangerState.active;
+        // Only prevent manual rising during final warning state
+        const canManualRise = this.manualRising && !(this.dangerState.active && this.dangerState.isFinalWarning);
         
         // Use whichever speed is faster: manual or natural
         const currentSpeed = canManualRise ? 
@@ -1164,33 +1206,27 @@ class CanvasGame {
             const centerY = Math.round(yPos + (BLOCK_SIZE/2));
             
             // Draw block with reduced opacity
-            this.ctx.globalAlpha = 0.3;
+            this.ctx.globalAlpha = PREVIEW_ROW_OPACITY;
             this.ctx.fillStyle = this.getBlockColor(blockType);
             this.ctx.beginPath();
-            this.ctx.roundRect(xPos, yPos, BLOCK_SIZE, BLOCK_SIZE, 8);
+            this.ctx.roundRect(xPos, yPos, BLOCK_SIZE, BLOCK_SIZE, BLOCK_CORNER_RADIUS);
             this.ctx.fill();
             
             // Draw symbol
             const symbol = this.blockSymbols[blockType];
             if (symbol) {
-                this.ctx.font = '30px Arial';
+                this.ctx.font = `${BLOCK_FONT_SIZE}px ${BLOCK_FONT_FAMILY}`;
                 this.ctx.textAlign = 'center';
                 this.ctx.textBaseline = 'middle';
                 
                 // Add strong black shadow
                 this.ctx.shadowColor = 'rgba(0,0,0,0.8)';
-                this.ctx.shadowBlur = 4;
-                this.ctx.shadowOffsetX = 2;
-                this.ctx.shadowOffsetY = 2;
+                this.ctx.shadowBlur = BLOCK_SHADOW_BLUR;
+                this.ctx.shadowOffsetX = BLOCK_SHADOW_OFFSET;
+                this.ctx.shadowOffsetY = BLOCK_SHADOW_OFFSET;
                 
                 this.ctx.fillStyle = 'white';
                 this.ctx.fillText(symbol, centerX, centerY);
-                
-                // Reset shadow settings
-                this.ctx.shadowColor = 'transparent';
-                this.ctx.shadowBlur = 0;
-                this.ctx.shadowOffsetX = 0;
-                this.ctx.shadowOffsetY = 0;
             }
             this.ctx.globalAlpha = 1;
         }
@@ -1253,7 +1289,6 @@ class CanvasGame {
         if (this.fallingBlocks.size === 0) return;
         
         let allBlocksLanded = true;
-        const fallDuration = 150; // Duration of fall animation in ms
         
         this.fallingBlocks.forEach(key => {
             const [x, targetY] = key.split(',').map(Number);
@@ -1264,7 +1299,7 @@ class CanvasGame {
                 return;
             }
             
-            const progress = Math.min((currentTime - block.fallStart) / fallDuration, 1);
+            const progress = Math.min((currentTime - block.fallStart) / FALL_ANIMATION_DURATION, 1);
             
             if (progress >= 1) {
                 // Block has finished falling
@@ -1309,7 +1344,7 @@ class CanvasGame {
         
         // Calculate and smooth FPS
         const deltaTime = currentTime - this.lastFrameTime;
-        this.frameTimes[this.frameCount % 60] = deltaTime;
+        this.frameTimes[this.frameCount % FPS_SAMPLE_SIZE] = deltaTime;
         this.frameCount++;
         
         // Update falling blocks
@@ -1483,24 +1518,27 @@ class CanvasGame {
         const themeEmojis = Object.values(this.themeSymbols[currentTheme]);
         
         // Create floating emojis with pong-like movement
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < BACKGROUND_SETTINGS.EMOJI_COUNT; i++) {
             this.backgroundEmojis.push({
                 symbol: themeEmojis[i % themeEmojis.length],
                 x: Math.random() * window.innerWidth,
                 y: Math.random() * window.innerHeight,
-                speedX: (Math.random() - 0.5) * 2,  // Random direction
-                speedY: (Math.random() - 0.5) * 2,
-                size: 60 + Math.random() * 40
+                speedX: (Math.random() - 0.5) * BACKGROUND_SETTINGS.EMOJI_SPEED,
+                speedY: (Math.random() - 0.5) * BACKGROUND_SETTINGS.EMOJI_SPEED,
+                size: BACKGROUND_SETTINGS.MIN_EMOJI_SIZE + Math.random() * 
+                    (BACKGROUND_SETTINGS.MAX_EMOJI_SIZE - BACKGROUND_SETTINGS.MIN_EMOJI_SIZE)
             });
         }
 
-        // Create more particles for fullscreen
-        for (let i = 0; i < 20; i++) {
+        // Create particles
+        for (let i = 0; i < BACKGROUND_SETTINGS.PARTICLE_COUNT; i++) {
             this.particles.push({
                 x: Math.random() * window.innerWidth,
                 y: Math.random() * window.innerHeight,
-                speed: 0.5 + Math.random() * 0.5,
-                size: 3 + Math.random() * 3
+                speed: BACKGROUND_SETTINGS.PARTICLE_MIN_SPEED + Math.random() * 
+                    (BACKGROUND_SETTINGS.PARTICLE_MAX_SPEED - BACKGROUND_SETTINGS.PARTICLE_MIN_SPEED),
+                size: BACKGROUND_SETTINGS.PARTICLE_MIN_SIZE + Math.random() * 
+                    (BACKGROUND_SETTINGS.PARTICLE_MAX_SIZE - BACKGROUND_SETTINGS.PARTICLE_MIN_SIZE)
             });
         }
         
@@ -1560,19 +1598,12 @@ class CanvasGame {
     }
 
     checkDangerState() {
-        // Base warning duration in milliseconds (2000ms = 2 seconds)
-        const baseWarningDuration = 2000;
-        
-        // Difficulty-based duration multipliers
-        const durationMultipliers = {
-            'very-easy': 2.0,    // 4 seconds
-            'easy': 1.5,         // 3 seconds
-            'normal': 1.0,       // 2 seconds
-            'hard': 0.75,        // 1.5 seconds
-            'very-hard': 0.5     // 1 second
-        };
+        // Check if any blocks are in the danger zone (top N rows)
+        const hasBlocksInDangerZone = Array.from({length: GAME_RULES.DANGER_TOP_ROWS}, (_, i) => 
+            this.grid[i].some(block => block !== null)
+        ).some(Boolean);
 
-        // Check top row for blocks
+        // Check specifically for blocks in the very top row
         const hasBlocksAtTop = this.grid[0].some(block => block !== null);
         
         if (hasBlocksAtTop && !this.dangerState.active) {
@@ -1584,22 +1615,43 @@ class CanvasGame {
             this.dangerState = {
                 active: true,
                 startTime: performance.now(),
-                warningDuration: baseWarningDuration * durationMultipliers[this.speedState.difficulty],
+                warningDuration: DANGER_WARNING_DURATIONS[this.speedState.difficulty],
                 isFinalWarning: true,
                 previousSpeed: currentSpeed // Store the speed to resume at
+            };
+        } else if (hasBlocksInDangerZone && !this.dangerState.active) {
+            // Enter early warning state but don't stop rising yet
+            this.dangerState = {
+                active: true,
+                startTime: performance.now(),
+                warningDuration: DANGER_WARNING_DURATIONS[this.speedState.difficulty],
+                isFinalWarning: false
             };
         } else if (hasBlocksAtTop && this.dangerState.active && this.dangerState.isFinalWarning) {
             // Check if time's up during final warning
             const timeInDanger = performance.now() - this.dangerState.startTime;
             if (timeInDanger >= this.dangerState.warningDuration) {
                 this.gameOver = true;
-                this.showGameOver();  // Show the game over modal
+                this.showGameOver();
             }
-        } else if (!hasBlocksAtTop && this.dangerState.active && this.dangerState.isFinalWarning) {
-            // Player cleared the top row in time
+        } else if (!hasBlocksInDangerZone && this.dangerState.active) {
+            // Player cleared all blocks from danger zone
             this.dangerState.active = false;
-            // Resume at the previous speed instead of fixed value
-            this.risingState.speed = this.dangerState.previousSpeed;
+            if (this.dangerState.isFinalWarning) {
+                // Resume at the previous speed if we were in final warning
+                this.risingState.speed = this.dangerState.previousSpeed;
+            }
+        } else if (hasBlocksAtTop && this.dangerState.active && !this.dangerState.isFinalWarning) {
+            // Escalate from early warning to final warning
+            const currentSpeed = this.risingState.speed;
+            this.risingState.speed = 0;
+            this.dangerState = {
+                active: true,
+                startTime: performance.now(),
+                warningDuration: DANGER_WARNING_DURATIONS[this.speedState.difficulty],
+                isFinalWarning: true,
+                previousSpeed: currentSpeed
+            };
         }
     }
 
@@ -1630,8 +1682,8 @@ class CanvasGame {
         document.getElementById('gameOverModal').style.display = 'none';
         
         // Get current saved speed setting
-        const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || 3;
-        const savedDifficulty = localStorage.getItem('gameDifficulty') || 'easy';
+        const savedSpeed = parseInt(localStorage.getItem('gameSpeed')) || DEFAULT_SPEED;
+        const savedDifficulty = localStorage.getItem('gameDifficulty') || DEFAULT_DIFFICULTY;
         
         // Update speed state with saved values
         this.speedState = {
@@ -1639,8 +1691,8 @@ class CanvasGame {
             currentSpeed: savedSpeed,
             difficulty: savedDifficulty,
             lastSpeedIncrease: performance.now(),
-            baseIncreaseInterval: 30000,
-            baseSpeedIncrease: 1
+            baseIncreaseInterval: SPEED_SETTINGS.BASE_INCREASE_INTERVAL,
+            baseSpeedIncrease: SPEED_SETTINGS.BASE_SPEED_INCREASE
         };
         
         // Reset game state
@@ -1654,11 +1706,11 @@ class CanvasGame {
         this.floatingScores = [];
         this.matchCountPopups = [];
         
-        // Reset danger state
+        // Reset danger state with difficulty-based warning duration
         this.dangerState = {
             active: false,
             startTime: 0,
-            warningDuration: 2000,
+            warningDuration: DANGER_WARNING_DURATIONS[savedDifficulty],
             isFinalWarning: false
         };
         
